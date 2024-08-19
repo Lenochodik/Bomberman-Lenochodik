@@ -5,6 +5,19 @@
 @addedOn: 2024-00-00
 */
 
+// = Helper functions ==============================
+// From: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
+function getRandomInt(min, max) {
+  const minCeiled = Math.ceil(min)
+  const maxFloored = Math.floor(max)
+  return Math.floor(Math.random() * (maxFloored - minCeiled) + minCeiled) // The maximum is exclusive and the minimum is inclusive
+}
+
+function getRandomItem(arr) {
+  return arr[getRandomInt(0, arr.length)]
+}
+// =================================================
+
 const player = "p"
 const bomb1 = "1"
 const bomb2 = "2"
@@ -230,11 +243,18 @@ FFFFFFFFFFFFFFFF`],
 
 setSolids([player, bomb1, bomb2, bomb3, crate])
 
-
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
 
 function addSpriteWithReturn(x, y, spriteType) {
   addSprite(x, y, spriteType)
   return getAll(spriteType).at(-1) // Little bit hacky, but should work
+}
+
+function isSpriteInBounds(x, y) {
+  return x >= 0 && y >= 0 &&
+    x < width() && y < height()
 }
 
 
@@ -299,6 +319,13 @@ const soundPlayerMoveForbidden = tune`
 3100`
 
 
+let gameState = {
+  bombsToPlant: 1,
+  flameLength: 2, // TODO: change to 1
+  score: 0,
+}
+
+
 const bombTimeoutTime = 5000
 
 
@@ -335,12 +362,66 @@ onInput("k", () => {
   const bombObject = addSpriteWithReturn(playerObject.x, playerObject.y, bomb1)
   playTune(soundBombPlant)
 
-  setInterval(() => {
+  setTimeout(() => {
     playTune(soundBombExplodes)
 
     const tileSprites = getTile(bombObject.x, bombObject.y)
     clearTile(bombObject.x, bombObject.y)
     // TODO: add sprites from tile before?
+
+    // Add fire
     addSprite(bombObject.x, bombObject.y, fireCross)
+    // -- L
+    for (let i = 1; i <= gameState.flameLength; i++) {
+      const newCoords = [bombObject.x - i, bombObject.y]
+
+      if (!isSpriteInBounds(...newCoords))
+        break
+
+      addSprite(
+        ...newCoords,
+        i === gameState.flameLength ?
+        fireL : fireHorizontal
+      )
+    }
+    // -- R
+    for (let i = 1; i <= gameState.flameLength; i++) {
+      const newCoords = [bombObject.x + i, bombObject.y]
+
+      if (!isSpriteInBounds(...newCoords))
+        break
+
+      addSprite(
+        ...newCoords,
+        i === gameState.flameLength ?
+        fireR : fireHorizontal
+      )
+    }
+    // -- T
+    for (let i = 1; i <= gameState.flameLength; i++) {
+      const newCoords = [bombObject.x, bombObject.y - i]
+
+      if (!isSpriteInBounds(...newCoords))
+        break
+
+      addSprite(
+        ...newCoords,
+        i === gameState.flameLength ?
+        fireT : fireVertical
+      )
+    }
+    // -- B
+    for (let i = 1; i <= gameState.flameLength; i++) {
+      const newCoords = [bombObject.x, bombObject.y + i]
+
+      if (!isSpriteInBounds(...newCoords))
+        break
+
+      addSprite(
+        ...newCoords,
+        i === gameState.flameLength ?
+        fireB : fireVertical
+      )
+    }
   }, bombTimeoutTime)
 })
