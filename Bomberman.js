@@ -1,6 +1,9 @@
 /*
+First time? Check out the tutorial game:
+https://sprig.hackclub.com/gallery/getting_started
+
 @title: Bomberman
-@author: Lenochodik
+@author: 
 @tags: []
 @addedOn: 2024-00-00
 */
@@ -99,10 +102,9 @@ F66FFFFFFFFFF66F
 F6F6666666666F6F
 FF666666666666FF
 FFFFFFFFFFFFFFFF`],
-
 )
 
-setSolids([])
+setSolids([player, bomb1, bomb2, bomb3, crate])
 
 let level = 0
 const levels = [
@@ -117,16 +119,77 @@ p.12321c..
 ..........`
 ]
 
+const soundBombPlant = tune`
+500: C5^500,
+15500`
+const melody1 = tune`
+123.96694214876032: C5~123.96694214876032,
+123.96694214876032: E5~123.96694214876032,
+123.96694214876032: C5~123.96694214876032,
+123.96694214876032: D5~123.96694214876032,
+123.96694214876032: E5~123.96694214876032,
+123.96694214876032,
+123.96694214876032: D5~123.96694214876032,
+123.96694214876032: E5~123.96694214876032,
+123.96694214876032: D5~123.96694214876032,
+123.96694214876032: C5~123.96694214876032,
+247.93388429752065,
+123.96694214876032: C5~123.96694214876032,
+123.96694214876032: E5~123.96694214876032,
+123.96694214876032: C5~123.96694214876032,
+123.96694214876032: D5~123.96694214876032,
+123.96694214876032: E5~123.96694214876032,
+123.96694214876032,
+123.96694214876032: D5~123.96694214876032,
+123.96694214876032: E5~123.96694214876032,
+123.96694214876032: D5~123.96694214876032,
+123.96694214876032: C5~123.96694214876032,
+247.93388429752065,
+123.96694214876032: C5~123.96694214876032,
+123.96694214876032: E5~123.96694214876032,
+123.96694214876032: C5~123.96694214876032,
+123.96694214876032: D5~123.96694214876032,
+123.96694214876032: E5~123.96694214876032,
+123.96694214876032,
+123.96694214876032: D5~123.96694214876032,
+123.96694214876032: E5~123.96694214876032`
+const soundPlayerMove = tune`
+500: D5~500,
+15500`
+const soundPlayerMoveForbidden = tune`
+500: D5~500 + E5~500 + F5~500,
+15500`
+
 setMap(levels[level])
 
 setPushables({
   [player]: []
 })
 
+let playerObject = getFirst(player)
+
 onInput("s", () => {
-  getFirst(player).y += 1
+  playerObject.y += 1
+  playTune(soundPlayerMove)
 })
 
-afterInput(() => {
+onInput("w", () => {
+  playerObject.y -= 1
+  playTune(soundPlayerMove)
+})
 
+onInput("a", () => {
+  playerObject.x -= 1
+  playTune(soundPlayerMove)
+})
+
+onInput("d", () => {
+  playerObject.x += 1
+  playTune(soundPlayerMove)
+})
+
+onInput("k", () => {
+  // Spawn a bomb
+  addSprite(playerObject.x, playerObject.y, bomb1)
+  playTune(soundBombPlant)
 })
