@@ -376,7 +376,22 @@ const soundPlayerMoveForbidden = tune`
 let gameState = {
   bombsToPlant: 1,
   flameLength: 1,
+  playerSpeedMs: 100,
+  explosionLastsMs: 500,
   score: 0,
+  // player last move tick
+  playerLastMoveAt: 0
+}
+
+function checkIfPlayerCanMove() {
+  const now = performance.now()
+
+  if(now - gameState.playerLastMoveAt >= gameState.playerSpeedMs) {
+    gameState.playerLastMoveAt = now
+    return true
+  }
+  
+  return false
 }
 
 
@@ -393,21 +408,29 @@ setPushables({
 let playerObject = getFirst(player)
 
 onInput("s", () => {
+  if(!checkIfPlayerCanMove()) return
+  
   playerObject.y += 1
   playTune(soundPlayerMove)
 })
 
 onInput("w", () => {
+  if(!checkIfPlayerCanMove()) return
+  
   playerObject.y -= 1
   playTune(soundPlayerMove)
 })
 
 onInput("a", () => {
+  if(!checkIfPlayerCanMove()) return
+  
   playerObject.x -= 1
   playTune(soundPlayerMove)
 })
 
 onInput("d", () => {
+  if(!checkIfPlayerCanMove()) return
+  
   playerObject.x += 1
   playTune(soundPlayerMove)
 })
@@ -445,6 +468,8 @@ const directionsFires = {
 }
 
 function explodeInOneDirection(bombCoords, direction) {
+  let explodedCoords = []
+  
   const directionCoords = directionsCoords[direction]
   const { end: fireEnd, middle: fireMiddle } = directionsFires[direction]
 
@@ -472,11 +497,19 @@ function explodeInOneDirection(bombCoords, direction) {
       ...newCoords,
       i === gameState.flameLength ? fireEnd : fireMiddle
     )
+
+    explodedCoords.push(newCoords)
   }
+
+  return explodedCoords
 }
 
 
 onInput("k", () => {
+  if(gameState.bombsToPlant <= 0)
+    return
+  gameState.bombsToPlant--
+  
   // Spawn a bomb
   const bombObject = addSpriteWithReturn(playerObject.x, playerObject.y, bomb1)
   playTune(soundBombPlant)
@@ -489,12 +522,21 @@ onInput("k", () => {
     // TODO: add sprites from tile before?
 
     // Add fire, explosion
+    let explodedCoords = [[bombObject.x, bombObject.y]]
     addSprite(bombObject.x, bombObject.y, fireCross)
-    explodeInOneDirection([bombObject.x, bombObject.y], directionsEnum.LEFT)
-    explodeInOneDirection([bombObject.x, bombObject.y], directionsEnum.RIGHT)
-    explodeInOneDirection([bombObject.x, bombObject.y], directionsEnum.TOP)
-    explodeInOneDirection([bombObject.x, bombObject.y], directionsEnum.BOTTOM)
+    explodedCoords.push(...explodeInOneDirection([bombObject.x, bombObject.y], directionsEnum.LEFT))
+    explodedCoords.push(...explodeInOneDirection([bombObject.x, bombObject.y], directionsEnum.RIGHT))
+    explodedCoords.push(...explodeInOneDirection([bombObject.x, bombObject.y], directionsEnum.TOP))
+    explodedCoords.push(...explodeInOneDirection([bombObject.x, bombObject.y], directionsEnum.BOTTOM))
 
+    // Hide explosion after some time
+    setTimeout(() => {
+      for(let coords of explodedCoords) {
+        clearTile(...coords)
+      }
+    }, gameState.explosionLastsMs)
 
+    // Change game state
+    gameState.bombsToPlant++
   }, bombTimeoutTime)
 })
