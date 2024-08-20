@@ -32,6 +32,9 @@ const fireL = "R"
 const fireR = "T"
 const fireT = "Z"
 const fireB = "U"
+const monster1 = "m"
+const monster2 = "i"
+const monster3 = "j"
 
 const grassBackground = "*"
 
@@ -55,8 +58,8 @@ CC...CCCCC...F..
 ...CC2222200001L
 ...CCC222C00000L
 ....CCCCCC000000
-.....C...C.0000.
-....LL...LL.....`],
+....LC...CL0000.
+...LLL...LLL....`],
   [bomb1, bitmap`
 .......6........
 .......66.......
@@ -264,24 +267,75 @@ FFFFFFFFFFFFFFFF`],
 ................
 ................
 ................`],
+  [monster1, bitmap`
+.......00.......
+.......33...1...
+......0000..1111
+......8888...1L1
+.....8H8838...LL
+....882H3288...L
+....88088088...9
+....88888888...0
+....8883H888...0
+88...888888...88
+.88...8888...880
+.888.833HH8.888.
+..888338HHH888..
+.33.33388HHH.HH.
+..3338.88.8HHH..
+...33.88.8.HH...`],
+  [monster2, bitmap`
+................
+....DDDDDDD.....
+...DDDDDDDDD....
+..DDD4DDD4DDD...
+..DDD04D40DDD...
+..DDDDDDDDDDD...
+...DDD000DDD....
+....D0DDD0D.....
+F...FD4FDDDFF.F.
+FF.F4D4.DFDDFF..
+4FF44D4DDFD44DD.
+4.44DD4D..DD4.D.
+444DDF4D...D4.DD
+..DDFFDD4..D4F..
+.DDFF.D.4..D4F..
+DD.F.DD.44.DDFF.`],
+  [monster3, bitmap`
+................
+................
+.....555555.....
+.....5727755....
+....552722755...
+....577777275...
+....57LLLLL25...
+...5577070725...
+...57777L7775...
+...5757L7L775...
+...57577777755..
+..557577577575..
+..575775757775..
+..5757557575755.
+.55577577757575.
+5757775757577575`],
 
   [grassBackground, bitmap`
-4444444444444444
-4444444444444444
-4444444444444444
-4444444444444444
-4444444444444444
-4444444444444444
-4444444444444444
-4444444444444444
-4444444444444444
-4444444444444444
-4444444444444444
-4444444444444444
-4444444444444444
-4444444444444444
-4444444444444444
-4444444444444444`]
+1111111111111111
+1111111111111111
+1111111111111111
+1111111111111111
+1111111111111111
+1111111111111111
+1111111111111111
+1111111111111111
+1111111111111111
+1111111111111111
+1111111111111111
+1111111111111111
+1111111111111111
+1111111111111111
+1111111111111111
+1111111111111111`]
 )
 
 setSolids([
@@ -312,13 +366,13 @@ const levels = [
 ...............
 bbbbbbbbbbbbbbb
 bp............b
-b.b.b.b.b.b.b.b
-b...c.........b
-b.b.b.b.b.b.b.b
+b.bcb.bmb.b.b.b
 b.............b
 b.b.b.b.b.b.b.b
 b.............b
-b.b.b.b.b.b.b.b
+b.b.b.b.bib.b.b
+b.............b
+b.b.b.b.b.bjb.b
 b.............b
 b.b.b.b.b.b.b.b
 b.............b
@@ -386,11 +440,11 @@ let gameState = {
 function checkIfPlayerCanMove() {
   const now = performance.now()
 
-  if(now - gameState.playerLastMoveAt >= gameState.playerSpeedMs) {
+  if (now - gameState.playerLastMoveAt >= gameState.playerSpeedMs) {
     gameState.playerLastMoveAt = now
     return true
   }
-  
+
   return false
 }
 
@@ -408,29 +462,29 @@ setPushables({
 let playerObject = getFirst(player)
 
 onInput("s", () => {
-  if(!checkIfPlayerCanMove()) return
-  
+  if (!checkIfPlayerCanMove()) return
+
   playerObject.y += 1
   playTune(soundPlayerMove)
 })
 
 onInput("w", () => {
-  if(!checkIfPlayerCanMove()) return
-  
+  if (!checkIfPlayerCanMove()) return
+
   playerObject.y -= 1
   playTune(soundPlayerMove)
 })
 
 onInput("a", () => {
-  if(!checkIfPlayerCanMove()) return
-  
+  if (!checkIfPlayerCanMove()) return
+
   playerObject.x -= 1
   playTune(soundPlayerMove)
 })
 
 onInput("d", () => {
-  if(!checkIfPlayerCanMove()) return
-  
+  if (!checkIfPlayerCanMove()) return
+
   playerObject.x += 1
   playTune(soundPlayerMove)
 })
@@ -469,7 +523,7 @@ const directionsFires = {
 
 function explodeInOneDirection(bombCoords, direction) {
   let explodedCoords = []
-  
+
   const directionCoords = directionsCoords[direction]
   const { end: fireEnd, middle: fireMiddle } = directionsFires[direction]
 
@@ -506,10 +560,10 @@ function explodeInOneDirection(bombCoords, direction) {
 
 
 onInput("k", () => {
-  if(gameState.bombsToPlant <= 0)
+  if (gameState.bombsToPlant <= 0)
     return
   gameState.bombsToPlant--
-  
+
   // Spawn a bomb
   const bombObject = addSpriteWithReturn(playerObject.x, playerObject.y, bomb1)
   playTune(soundBombPlant)
@@ -522,7 +576,9 @@ onInput("k", () => {
     // TODO: add sprites from tile before?
 
     // Add fire, explosion
-    let explodedCoords = [[bombObject.x, bombObject.y]]
+    let explodedCoords = [
+      [bombObject.x, bombObject.y]
+    ]
     addSprite(bombObject.x, bombObject.y, fireCross)
     explodedCoords.push(...explodeInOneDirection([bombObject.x, bombObject.y], directionsEnum.LEFT))
     explodedCoords.push(...explodeInOneDirection([bombObject.x, bombObject.y], directionsEnum.RIGHT))
@@ -531,7 +587,7 @@ onInput("k", () => {
 
     // Hide explosion after some time
     setTimeout(() => {
-      for(let coords of explodedCoords) {
+      for (let coords of explodedCoords) {
         clearTile(...coords)
       }
     }, gameState.explosionLastsMs)
