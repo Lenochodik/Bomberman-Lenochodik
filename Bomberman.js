@@ -22,15 +22,22 @@ const player = "p"
 const bomb1 = "1"
 const bomb2 = "2"
 const bomb3 = "3"
+const block = "b"
 const crate = "c"
 
-const fireCross = "f"
-const fireHorizontal = "h"
-const fireVertical = "v"
-const fireL = "a"
-const fireR = "d"
-const fireT = "w"
-const fireB = "b"
+const fireCross = "Q"
+const fireHorizontal = "W"
+const fireVertical = "E"
+const fireL = "R"
+const fireR = "T"
+const fireT = "Z"
+const fireB = "U"
+
+const grassBackground = "*"
+
+const bombsSprites = [bomb1, bomb2, bomb3]
+const blocksSprites = [block]
+const cratesSprites = [crate]
 
 setLegend(
   [player, bitmap`
@@ -119,6 +126,24 @@ F66FFFFFFFFFF66F
 F6F6666666666F6F
 FF666666666666FF
 FFFFFFFFFFFFFFFF`],
+  // TODO: rework this block bitmap
+  [block, bitmap`
+0000000000000000
+0111111111111110
+0111111111111110
+0111111111111110
+0111111111111110
+0000000000000000
+0LLLLLLLLLLLLLL0
+0LLLLLLLLLLLLLL0
+0LLLLLLLLLLLLLL0
+0LLLLLLLLLLLLLL0
+0LLLLLLLLLLLLLL0
+0LLLLLLLLLLLLLL0
+0LLLLLLLLLLLLLL0
+0LLLLLLLLLLLLLL0
+0LLLLLLLLLLLLLL0
+0000000000000000`],
   // TODO: just for debugging, create better sprites for fire
   [fireCross, bitmap`
 ......3333......
@@ -239,9 +264,32 @@ FFFFFFFFFFFFFFFF`],
 ................
 ................
 ................`],
+
+  [grassBackground, bitmap`
+4444444444444444
+4444444444444444
+4444444444444444
+4444444444444444
+4444444444444444
+4444444444444444
+4444444444444444
+4444444444444444
+4444444444444444
+4444444444444444
+4444444444444444
+4444444444444444
+4444444444444444
+4444444444444444
+4444444444444444
+4444444444444444`]
 )
 
-setSolids([player, bomb1, bomb2, bomb3, crate])
+setSolids([
+  player,
+  bomb1, bomb2, bomb3,
+  block,
+  crate
+])
 
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
@@ -261,14 +309,20 @@ function isSpriteInBounds(x, y) {
 let level = 0
 const levels = [
   map`
-..........
-..........
-p.12321c..
-......w...
-....ahfhd.
-......v...
-......b...
-..........`
+...............
+bbbbbbbbbbbbbbb
+bp............b
+b.b.b.b.b.b.b.b
+b...c.........b
+b.b.b.b.b.b.b.b
+b.............b
+b.b.b.b.b.b.b.b
+b.............b
+b.b.b.b.b.b.b.b
+b.............b
+b.b.b.b.b.b.b.b
+b.............b
+bbbbbbbbbbbbbbb`
 ]
 
 const soundBombPlant = tune`
@@ -321,7 +375,7 @@ const soundPlayerMoveForbidden = tune`
 
 let gameState = {
   bombsToPlant: 1,
-  flameLength: 2, // TODO: change to 1
+  flameLength: 1,
   score: 0,
 }
 
@@ -330,6 +384,7 @@ const bombTimeoutTime = 5000
 
 
 setMap(levels[level])
+setBackground(grassBackground)
 
 setPushables({
   [player]: []
@@ -357,6 +412,70 @@ onInput("d", () => {
   playTune(soundPlayerMove)
 })
 
+function addCoords(a, b) {
+  return [
+    a[0] + b[0],
+    a[1] + b[1]
+  ]
+}
+
+function multiplyCoords(a, m) {
+  return [a[0] * m, a[1] * m]
+}
+
+const directionsEnum = {
+  LEFT: "L",
+  RIGHT: "R",
+  TOP: "T",
+  BOTTOM: "B",
+}
+
+const directionsCoords = {
+  [directionsEnum.LEFT]: [-1, 0],
+  [directionsEnum.RIGHT]: [1, 0],
+  [directionsEnum.TOP]: [0, -1],
+  [directionsEnum.BOTTOM]: [0, 1]
+}
+
+const directionsFires = {
+  [directionsEnum.LEFT]: { end: fireL, middle: fireHorizontal },
+  [directionsEnum.RIGHT]: { end: fireR, middle: fireHorizontal },
+  [directionsEnum.TOP]: { end: fireT, middle: fireVertical },
+  [directionsEnum.BOTTOM]: { end: fireB, middle: fireVertical },
+}
+
+function explodeInOneDirection(bombCoords, direction) {
+  const directionCoords = directionsCoords[direction]
+  const { end: fireEnd, middle: fireMiddle } = directionsFires[direction]
+
+  for (let i = 1; i <= gameState.flameLength; i++) {
+    const newCoords = addCoords(bombCoords, multiplyCoords(directionCoords, i))
+
+    if (!isSpriteInBounds(...newCoords))
+      break
+
+    const tileSprites = getTile(...newCoords)
+
+    // Block stops fire
+    if (tileSprites.some(x => blocksSprites.includes(x.type)))
+      break
+
+    // Crate breaks
+    if (tileSprites.some(x => cratesSprites.includes(x.type)))
+      break
+
+    // Explode other bomb
+    if (tileSprites.some(x => bombsSprites.includes(x.type)))
+      break
+
+    addSprite(
+      ...newCoords,
+      i === gameState.flameLength ? fireEnd : fireMiddle
+    )
+  }
+}
+
+
 onInput("k", () => {
   // Spawn a bomb
   const bombObject = addSpriteWithReturn(playerObject.x, playerObject.y, bomb1)
@@ -369,59 +488,13 @@ onInput("k", () => {
     clearTile(bombObject.x, bombObject.y)
     // TODO: add sprites from tile before?
 
-    // Add fire
+    // Add fire, explosion
     addSprite(bombObject.x, bombObject.y, fireCross)
-    // -- L
-    for (let i = 1; i <= gameState.flameLength; i++) {
-      const newCoords = [bombObject.x - i, bombObject.y]
+    explodeInOneDirection([bombObject.x, bombObject.y], directionsEnum.LEFT)
+    explodeInOneDirection([bombObject.x, bombObject.y], directionsEnum.RIGHT)
+    explodeInOneDirection([bombObject.x, bombObject.y], directionsEnum.TOP)
+    explodeInOneDirection([bombObject.x, bombObject.y], directionsEnum.BOTTOM)
 
-      if (!isSpriteInBounds(...newCoords))
-        break
 
-      addSprite(
-        ...newCoords,
-        i === gameState.flameLength ?
-        fireL : fireHorizontal
-      )
-    }
-    // -- R
-    for (let i = 1; i <= gameState.flameLength; i++) {
-      const newCoords = [bombObject.x + i, bombObject.y]
-
-      if (!isSpriteInBounds(...newCoords))
-        break
-
-      addSprite(
-        ...newCoords,
-        i === gameState.flameLength ?
-        fireR : fireHorizontal
-      )
-    }
-    // -- T
-    for (let i = 1; i <= gameState.flameLength; i++) {
-      const newCoords = [bombObject.x, bombObject.y - i]
-
-      if (!isSpriteInBounds(...newCoords))
-        break
-
-      addSprite(
-        ...newCoords,
-        i === gameState.flameLength ?
-        fireT : fireVertical
-      )
-    }
-    // -- B
-    for (let i = 1; i <= gameState.flameLength; i++) {
-      const newCoords = [bombObject.x, bombObject.y + i]
-
-      if (!isSpriteInBounds(...newCoords))
-        break
-
-      addSprite(
-        ...newCoords,
-        i === gameState.flameLength ?
-        fireB : fireVertical
-      )
-    }
   }, bombTimeoutTime)
 })
