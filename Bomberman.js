@@ -35,11 +35,11 @@ function isSpriteInBounds(x, y) {
 }
 
 // -- Player
-function checkIfPlayerCanMove() {
+function checkPlayerSpeedLimit() {
   const now = performance.now()
 
-  if (now - gameState.playerLastMoveAt >= gameState.playerSpeedMs) {
-    gameState.playerLastMoveAt = now
+  if (now - gameState.player.playerLastMoveAt >= gameState.player.playerSpeedMs) {
+    gameState.player.playerLastMoveAt = now
     return true
   }
 
@@ -47,14 +47,53 @@ function checkIfPlayerCanMove() {
 }
 
 function movePlayer(direction) {
-  if (!checkIfPlayerCanMove()) return
+  if (!playerObject || gameState.gameOver) return
+  if (!checkPlayerSpeedLimit()) return
 
-  const directionCoords = directionsCoords[direction]
-
-  playerObject.x += directionCoords[0]
-  playerObject.y += directionCoords[1]
+  const [dx, dy] = directionsCoords[direction]
+  playerObject.x += dx
+  playerObject.y += dy
 
   playTune(soundPlayerMove)
+
+  // Check new tile
+  const tileSprites = getTile(playerObject.x, playerObject.y)
+
+  // Explosion and monsters kills player
+  if (tileSprites.some(x => categoryFire.includes(x.type)) ||
+    tileSprites.some(x => categoryMonsters.includes(x.type))) {
+    playerObject.remove()
+    playerObject = null
+    gameState.gameOver = true // TODO: remove only a life
+  }
+
+  // Player can collect powerups
+  if (tileSprites.some(x => categoryPowerups.includes(x.type))) {
+    const powerupObject = tileSprites.find(x => categoryPowerups.includes(x.type))
+
+    switch (powerupObject.type) {
+      case powerupDouble:
+        // TODO
+        break
+      case powerupFlame:
+        gameState.player.flameLength++
+        break
+      case powerupBomb:
+        gameState.player.bombsToPlant++
+        break
+      case powerupSpeed:
+        gameState.player.playerSpeedMs = 50
+        break
+      case powerupRemoteControl:
+        // TODO
+        break
+      case powerupPassThroughBombs:
+        // TODO
+        break
+    }
+
+    powerupObject.remove()
+  }
 }
 
 // -- Coords
@@ -76,7 +115,7 @@ function explodeInOneDirection(bombCoords, direction) {
   const directionCoords = directionsCoords[direction]
   const { end: fireEnd, middle: fireMiddle } = directionsFires[direction]
 
-  for (let i = 1; i <= gameState.flameLength; i++) {
+  for (let i = 1; i <= gameState.player.flameLength; i++) {
     const newCoords = addCoords(bombCoords, multiplyCoords(directionCoords, i))
 
     if (!isSpriteInBounds(...newCoords))
@@ -98,7 +137,7 @@ function explodeInOneDirection(bombCoords, direction) {
 
     addSprite(
       ...newCoords,
-      i === gameState.flameLength ? fireEnd : fireMiddle
+      i === gameState.player.flameLength ? fireEnd : fireMiddle
     )
 
     explodedCoords.push(newCoords)
@@ -171,6 +210,10 @@ const categoryFire = [fireCross, fireHorizontal, fireVertical, fireL, fireR, fir
 const categoryMonsters = [monster1, monster2, monster3, monster4, monster5]
 const categoryPowerups = [powerupDouble, powerupFlame, powerupBomb, powerupSpeed, powerupRemoteControl, powerupPassThroughBombs]
 const categoryPortals = [portal1, portal2]
+// =================================================
+
+// = Animations ====================================
+const animationBomb = [bomb1, bomb2, bomb3, bomb2]
 // =================================================
 
 // = Legends, solids, pushables ====================
@@ -1024,17 +1067,25 @@ const directionsFires = {
 
 // -- Timeouts
 const bombTimeoutTimeMs = 5000
+const bombAnimationTimeMs = 500
 const explosionLastsMs = 500
 // =================================================
 
 // = Game state ====================================
 let gameState = {
-  bombsToPlant: 1,
-  flameLength: 1,
-  playerSpeedMs: 100,
+  gameOver: false,
+  player: {
+    bombsToPlant: 1,
+    flameLength: 1,
+    playerSpeedMs: 100,
+    // player last move tick
+    playerLastMoveAt: 0
+  },
+  level: {
+    portalCoords: [1, 0], // TODO: set randomly under crates,
+    powerupCoords: [0, 1] // TODO: set randomly under crates,
+  },
   score: 0,
-  // player last move tick
-  playerLastMoveAt: 0
 }
 // =================================================
 
@@ -1061,20 +1112,32 @@ onInput("d", () => {
 })
 
 onInput("k", () => {
-  if (gameState.bombsToPlant <= 0)
+  if (!playerObject || gameState.gameOver) return
+
+  if (gameState.player.bombsToPlant <= 0)
     return
-  gameState.bombsToPlant--
+  gameState.player.bombsToPlant--
 
   // Spawn a bomb
-  const bombObject = addSpriteWithReturn(playerObject.x, playerObject.y, bomb1)
+  let bombObject = addSpriteWithReturn(playerObject.x, playerObject.y, bomb1)
   playTune(soundBombPlant)
 
+  // Play bomb animation
+  let bombAnimationIdx = 0
+  const bombAnimationInterval = setInterval(() => {
+    bombAnimationIdx = (bombAnimationIdx + 1) % animationBomb.length
+    const bombNextType = animationBomb[bombAnimationIdx]
+    const bombCoords = [bombObject.x, bombObject.y]
+    bombObject.remove()
+    bombObject = addSpriteWithReturn(...bombCoords, bombNextType)
+  }, bombAnimationTimeMs)
+
   setTimeout(() => {
+    clearInterval(bombAnimationInterval)
+
     playTune(soundBombExplodes)
 
-    const tileSprites = getTile(bombObject.x, bombObject.y)
-    clearTile(bombObject.x, bombObject.y)
-    // TODO: add sprites from tile before?
+    bombObject.remove()
 
     // Add fire, explosion
     let explodedCoords = [
@@ -1094,7 +1157,7 @@ onInput("k", () => {
     }, explosionLastsMs)
 
     // Change game state
-    gameState.bombsToPlant++
+    gameState.player.bombsToPlant++
   }, bombTimeoutTimeMs)
 })
 // =================================================
