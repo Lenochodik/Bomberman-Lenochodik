@@ -6,6 +6,7 @@
 */
 
 // = Helper functions ==============================
+// -- Random
 // From: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
 function getRandomInt(min, max) {
   const minCeiled = Math.ceil(min)
@@ -16,22 +17,116 @@ function getRandomInt(min, max) {
 function getRandomItem(arr) {
   return arr[getRandomInt(0, arr.length)]
 }
+
+// -- Timing
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+// -- Sprig
+function addSpriteWithReturn(x, y, spriteType) {
+  addSprite(x, y, spriteType)
+  return getAll(spriteType).at(-1) // Little bit hacky, but should work
+}
+
+function isSpriteInBounds(x, y) {
+  return x >= 0 && y >= 0 &&
+    x < width() && y < height()
+}
+
+// -- Player
+function checkIfPlayerCanMove() {
+  const now = performance.now()
+
+  if (now - gameState.playerLastMoveAt >= gameState.playerSpeedMs) {
+    gameState.playerLastMoveAt = now
+    return true
+  }
+
+  return false
+}
+
+function movePlayer(direction) {
+  if (!checkIfPlayerCanMove()) return
+
+  const directionCoords = directionsCoords[direction]
+
+  playerObject.x += directionCoords[0]
+  playerObject.y += directionCoords[1]
+
+  playTune(soundPlayerMove)
+}
+
+// -- Coords
+function addCoords(a, b) {
+  return [
+    a[0] + b[0],
+    a[1] + b[1]
+  ]
+}
+
+function multiplyCoords(a, m) {
+  return [a[0] * m, a[1] * m]
+}
+
+// -- Bomb
+function explodeInOneDirection(bombCoords, direction) {
+  let explodedCoords = []
+
+  const directionCoords = directionsCoords[direction]
+  const { end: fireEnd, middle: fireMiddle } = directionsFires[direction]
+
+  for (let i = 1; i <= gameState.flameLength; i++) {
+    const newCoords = addCoords(bombCoords, multiplyCoords(directionCoords, i))
+
+    if (!isSpriteInBounds(...newCoords))
+      break
+
+    const tileSprites = getTile(...newCoords)
+
+    // Block stops fire
+    if (tileSprites.some(x => categoryBlocks.includes(x.type)))
+      break
+
+    // Crate breaks
+    if (tileSprites.some(x => categoryCrates.includes(x.type)))
+      break
+
+    // Explode other bomb
+    if (tileSprites.some(x => categoryBombs.includes(x.type)))
+      break
+
+    addSprite(
+      ...newCoords,
+      i === gameState.flameLength ? fireEnd : fireMiddle
+    )
+
+    explodedCoords.push(newCoords)
+  }
+
+  return explodedCoords
+}
 // =================================================
 
+// = Types =========================================
+// Player
 const player = "p"
+// Bombs
 const bomb1 = "1"
 const bomb2 = "2"
 const bomb3 = "3"
+// Blocks
 const block = "b"
-const blockLeft = "l"
-const blockRight = "r"
+const blockL = "l"
+const blockR = "r"
 const blockCorner1 = "q"
 const blockCorner2 = "x"
-const blockCorner3 = "g"
-const blockCorner4 = "n"
+const blockCornerTR = "g"
+const blockCornerTL = "n"
+// Crates
 const crate = "c"
 const crateExplosion = "e"
-
+// Fire
 const fireCross = "Q"
 const fireHorizontal = "W"
 const fireVertical = "E"
@@ -39,36 +134,48 @@ const fireL = "R"
 const fireR = "T"
 const fireT = "Z"
 const fireB = "U"
+// Monsters
 const monster1 = "m"
 const monster2 = "i"
 const monster3 = "j"
 const monster4 = "!"
 const monster5 = "("
-const powerup1 = "A"
-const powerup2 = "S"
-const powerup3 = "D"
-const powerup4 = "F"
-const powerup5 = "/"
-const powerup6 = ":"
+// Powerups
+const powerupDouble = "A"
+const powerupFlame = "S"
+const powerupBomb = "D"
+const powerupSpeed = "F"
+const powerupRemoteControl = "/"
+const powerupPassThroughBombs = ":"
+// Portals
 const portal1 = "H"
 const portal2 = "Y"
+// Game UI
+const borderT = "L"
+const borderB = "X"
+const borderL = "C"
+const borderR = "V"
+const borderBR = "B"
+const borderBL = "N"
+const borderTL = "M"
+const borderTR = ","
+// Backgrounds
+const background = "*"
+// =================================================
 
-const border1 = "L"
-const border2 = "X"
-const border3 = "C"
-const border4 = "V"
-const border5 = "B"
-const border6 = "N"
-const border7 = "M"
-const border8 = ","
+// = Type categories ===============================
+const categoryBombs = [bomb1, bomb2, bomb3]
+const categoryBlocks = [block, blockL, blockR, blockCorner1, blockCorner2, blockCornerTR, blockCornerTL]
+const categoryCrates = [crate, crateExplosion]
+const categoryFire = [fireCross, fireHorizontal, fireVertical, fireL, fireR, fireT, fireB]
+const categoryMonsters = [monster1, monster2, monster3, monster4, monster5]
+const categoryPowerups = [powerupDouble, powerupFlame, powerupBomb, powerupSpeed, powerupRemoteControl, powerupPassThroughBombs]
+const categoryPortals = [portal1, portal2]
+// =================================================
 
-const grassBackground = "*"
-
-const bombsSprites = [bomb1, bomb2, bomb3]
-const blocksSprites = [block]
-const cratesSprites = [crate]
-
+// = Legends, solids, pushables ====================
 setLegend(
+  // Player
   [player, bitmap`
 ...CC.....CC....
 6.CCCCCCCCCCC...
@@ -86,6 +193,7 @@ CC...CCCCC...F..
 ....CCCCCC000000
 ....LC...CL0000.
 ...LLL...LLL....`],
+  // Bombs
   [bomb1, bitmap`
 .......6........
 .......66.......
@@ -138,6 +246,7 @@ CC...CCCCC...F..
 ..0000000LL00...
 ...0000000L0....
 ....0000000.....`],
+  // Crates
   [crate, bitmap`
 FFFFFFFFFFFFFFFF
 FF666666666666FF
@@ -172,7 +281,7 @@ FFFFFFFFFFFFFFFF`],
 3939999999999393
 3399999999999933
 3333333333333333`],
-  // TODO: rework this block bitmap
+  // Blocks
   [block, bitmap`
 0000000000000000
 0111111111111110
@@ -190,7 +299,7 @@ FFFFFFFFFFFFFFFF`],
 0L0LLL0LLL0LL0L0
 0LLLLLLLLLLLLLL0
 0000000000000000`],
-  [blockLeft, bitmap`
+  [blockL, bitmap`
 0000000000000000
 01111100LLLLLLL0
 01LL110LLL0LL0L0
@@ -207,7 +316,7 @@ FFFFFFFFFFFFFFFF`],
 01LLL10L0LLLL0L0
 0111110LLLLLLLL0
 0000000000000000`],
-  [blockRight, bitmap`
+  [blockR, bitmap`
 0000000000000000
 0LLLLLLLL0111110
 0L0LLLL0L01LLL10
@@ -258,7 +367,7 @@ FFFFFFFFFFFFFFFF`],
 011110LLLLLLLLL0
 011110LLLLLLLLL0
 0111100000000000`],
-  [blockCorner3, bitmap`
+  [blockCornerTR, bitmap`
 0000000000000000
 0111111111111110
 01L1LLLLL1LL1L10
@@ -275,7 +384,7 @@ FFFFFFFFFFFFFFFF`],
 0LLLL0LLL01LLL10
 0L0LLLLL00111110
 0000000000000000`],
-  [blockCorner4, bitmap`
+  [blockCornerTL, bitmap`
 0000000000000000
 0111111111111110
 01LL1L1LLLLL1L10
@@ -292,6 +401,7 @@ FFFFFFFFFFFFFFFF`],
 01LLL10LLLLLLL00
 0111110L0LLL0LL0
 0000000000000000`],
+  // Fire
   [fireCross, bitmap`
 ...3962222693...
 ...3962222693...
@@ -411,6 +521,7 @@ FFFFFFFFFFFFFFFF`],
 ................
 ................
 ................`],
+  // Monsters
   [monster1, bitmap`
 .......00.......
 .......33...1...
@@ -496,7 +607,8 @@ D44D444444444D44
 D4444DDDDDDD444D
 .DDDD.......DDD.
 ................`],
-  [powerup1, bitmap`
+  // Powerups
+  [powerupDouble, bitmap`
 ..555555555555..
 .55555557577755.
 5555555555522555
@@ -513,7 +625,7 @@ D4444DDDDDDD444D
 5L55555555552755
 .5LL55555572255.
 ..5LLLL5555555..`],
-  [powerup2, bitmap`
+  [powerupFlame, bitmap`
 ..555555555555..
 .55555555777555.
 5555555555727755
@@ -530,7 +642,7 @@ D4444DDDDDDD444D
 555L555555522755
 .55LL5555572755.
 ..555555555555..`],
-  [powerup3, bitmap`
+  [powerupBomb, bitmap`
 ..555555655555..
 .55555559657755.
 5555555639552255
@@ -547,7 +659,7 @@ D4444DDDDDDD444D
 55L5500000057255
 .55LL5555557755.
 ..555555555555..`],
-  [powerup4, bitmap`
+  [powerupSpeed, bitmap`
 ..555555555555..
 .55555555777755.
 5555555555722755
@@ -564,7 +676,7 @@ D4444DDDDDDD444D
 55L6FF5556FF5755
 .55LL5555555555.
 ..555555555555..`],
-  [powerup5, bitmap`
+  [powerupRemoteControl, bitmap`
 ..555555555555..
 .55555555777755.
 5555555555722755
@@ -581,7 +693,7 @@ D4444DDDDDDD444D
 55L5550005555755
 .55LL5535555555.
 ..555555555555..`],
-  [powerup6, bitmap`
+  [powerupPassThroughBombs, bitmap`
 ..555555655555..
 .55555569677755.
 55555555F5722755
@@ -598,6 +710,7 @@ D4444DDDDDDD444D
 55L500000L115755
 .55LL0000005555.
 ..555555555555..`],
+  // Portals
   [portal1, bitmap`
 0000000000000000
 010LLL1221LLL010
@@ -632,8 +745,8 @@ D4444DDDDDDD444D
 0000000000000000
 010LLL1221LLL010
 0000000000000000`],
-
-  [border1, bitmap`
+  // Game UI
+  [borderT, bitmap`
 3333333333333333
 9999999999999999
 6666666666666666
@@ -650,7 +763,7 @@ D4444DDDDDDD444D
 7777777777777777
 7777777777777777
 7777777777777777`],
-  [border2, bitmap`
+  [borderB, bitmap`
 7777777777777777
 7777777777777777
 7777777777777777
@@ -667,7 +780,7 @@ D4444DDDDDDD444D
 6666666666666666
 9999999999999999
 3333333333333333`],
-  [border3, bitmap`
+  [borderL, bitmap`
 3962777777777777
 3962777777777777
 3962777777777777
@@ -684,7 +797,7 @@ D4444DDDDDDD444D
 3962777777777777
 3962777777777777
 3962777777777777`],
-  [border4, bitmap`
+  [borderR, bitmap`
 7777777777772693
 7777777777772693
 7777777777772693
@@ -701,7 +814,7 @@ D4444DDDDDDD444D
 7777777777772693
 7777777777772693
 7777777777772693`],
-  [border5, bitmap`
+  [borderBR, bitmap`
 7777777777772693
 7777777777772693
 7777777777772693
@@ -718,7 +831,7 @@ D4444DDDDDDD444D
 6666666666666693
 9999999999999993
 3333333333333333`],
-  [border6, bitmap`
+  [borderBL, bitmap`
 3962777777777777
 3962777777777777
 3962777777777777
@@ -735,7 +848,7 @@ D4444DDDDDDD444D
 3966666666666666
 3999999999999999
 3333333333333333`],
-  [border7, bitmap`
+  [borderTL, bitmap`
 3333333333333333
 3999999999999999
 3966666666666666
@@ -752,7 +865,7 @@ D4444DDDDDDD444D
 3962777777777777
 3962777777777777
 3962777777777777`],
-  [border8, bitmap`
+  [borderTR, bitmap`
 3333333333333333
 9999999999999993
 6666666666666693
@@ -769,9 +882,8 @@ D4444DDDDDDD444D
 7777777777772693
 7777777777772693
 7777777777772693`],
-
-
-  [grassBackground, bitmap`
+  // Backgrounds
+  [background, bitmap`
 1111111111111111
 1111111111111111
 1111111111111111
@@ -791,27 +903,22 @@ D4444DDDDDDD444D
 )
 
 setSolids([
+  // Player
   player,
+  // Bombs
   bomb1, bomb2, bomb3,
-  block,
-  crate
+  // Blocks
+  block, blockL, blockR, blockCorner1, blockCorner2, blockCornerTR, blockCornerTL,
+  // Crates
+  crate, crateExplosion
 ])
 
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
+setPushables({
+  [player]: []
+})
+// =================================================
 
-function addSpriteWithReturn(x, y, spriteType) {
-  addSprite(x, y, spriteType)
-  return getAll(spriteType).at(-1) // Little bit hacky, but should work
-}
-
-function isSpriteInBounds(x, y) {
-  return x >= 0 && y >= 0 &&
-    x < width() && y < height()
-}
-
-
+// = Levels ========================================
 let level = 0
 const levels = [
   map`
@@ -831,22 +938,10 @@ l.b.b.b.b.b.b.r
 l.............r
 bbbbbbbbbbbbbbb`
 ]
+// =================================================
 
-const soundBombPlant = tune`
-100: C5^100,
-3100`
-const soundBombExplodes = tune`
-100: C4/100 + E4/100,
-100: D4/100 + F4/100,
-100: G4/100 + F4/100 + E4/100,
-100: E4/100 + F4/100 + G4/100,
-2800`
-const soundBombExplodes2 = tune`
-100: E5/100 + G5/100,
-100: F5/100 + A5/100,
-100: G5/100 + B5/100 + A5/100,
-100: B5/100 + A5/100 + G5/100,
-2800`
+// = Melodies, sounds ==============================
+// -- Melodies
 const melody1 = tune`
 115.38461538461539: C5~115.38461538461539,
 115.38461538461539: E5~115.38461538461539,
@@ -878,87 +973,34 @@ const melody1 = tune`
 115.38461538461539,
 115.38461538461539: D5~115.38461538461539,
 115.38461538461539: E5~115.38461538461539`
+// -- Sounds
+// ---- Player
 const soundPlayerMove = tune`
 100: D5~100,
 3100`
 const soundPlayerMoveForbidden = tune`
 100: D5~100 + E5~100 + F5~100,
 3100`
+// ---- Bombs
+const soundBombPlant = tune`
+100: C5^100,
+3100`
+const soundBombExplodes = tune`
+100: C4/100 + E4/100,
+100: D4/100 + F4/100,
+100: G4/100 + F4/100 + E4/100,
+100: E4/100 + F4/100 + G4/100,
+2800`
+const soundBombExplodes2 = tune`
+100: E5/100 + G5/100,
+100: F5/100 + A5/100,
+100: G5/100 + B5/100 + A5/100,
+100: B5/100 + A5/100 + G5/100,
+2800`
+// =================================================
 
-
-let gameState = {
-  bombsToPlant: 1,
-  flameLength: 1,
-  playerSpeedMs: 100,
-  explosionLastsMs: 500,
-  score: 0,
-  // player last move tick
-  playerLastMoveAt: 0
-}
-
-function checkIfPlayerCanMove() {
-  const now = performance.now()
-
-  if (now - gameState.playerLastMoveAt >= gameState.playerSpeedMs) {
-    gameState.playerLastMoveAt = now
-    return true
-  }
-
-  return false
-}
-
-
-const bombTimeoutTime = 5000
-
-
-setMap(levels[level])
-setBackground(grassBackground)
-
-setPushables({
-  [player]: []
-})
-
-let playerObject = getFirst(player)
-
-onInput("s", () => {
-  if (!checkIfPlayerCanMove()) return
-
-  playerObject.y += 1
-  playTune(soundPlayerMove)
-})
-
-onInput("w", () => {
-  if (!checkIfPlayerCanMove()) return
-
-  playerObject.y -= 1
-  playTune(soundPlayerMove)
-})
-
-onInput("a", () => {
-  if (!checkIfPlayerCanMove()) return
-
-  playerObject.x -= 1
-  playTune(soundPlayerMove)
-})
-
-onInput("d", () => {
-  if (!checkIfPlayerCanMove()) return
-
-  playerObject.x += 1
-  playTune(soundPlayerMove)
-})
-
-function addCoords(a, b) {
-  return [
-    a[0] + b[0],
-    a[1] + b[1]
-  ]
-}
-
-function multiplyCoords(a, m) {
-  return [a[0] * m, a[1] * m]
-}
-
+// = Constants =====================================
+// -- Directions
 const directionsEnum = {
   LEFT: "L",
   RIGHT: "R",
@@ -980,43 +1022,43 @@ const directionsFires = {
   [directionsEnum.BOTTOM]: { end: fireB, middle: fireVertical },
 }
 
-function explodeInOneDirection(bombCoords, direction) {
-  let explodedCoords = []
+// -- Timeouts
+const bombTimeoutTimeMs = 5000
+const explosionLastsMs = 500
+// =================================================
 
-  const directionCoords = directionsCoords[direction]
-  const { end: fireEnd, middle: fireMiddle } = directionsFires[direction]
-
-  for (let i = 1; i <= gameState.flameLength; i++) {
-    const newCoords = addCoords(bombCoords, multiplyCoords(directionCoords, i))
-
-    if (!isSpriteInBounds(...newCoords))
-      break
-
-    const tileSprites = getTile(...newCoords)
-
-    // Block stops fire
-    if (tileSprites.some(x => blocksSprites.includes(x.type)))
-      break
-
-    // Crate breaks
-    if (tileSprites.some(x => cratesSprites.includes(x.type)))
-      break
-
-    // Explode other bomb
-    if (tileSprites.some(x => bombsSprites.includes(x.type)))
-      break
-
-    addSprite(
-      ...newCoords,
-      i === gameState.flameLength ? fireEnd : fireMiddle
-    )
-
-    explodedCoords.push(newCoords)
-  }
-
-  return explodedCoords
+// = Game state ====================================
+let gameState = {
+  bombsToPlant: 1,
+  flameLength: 1,
+  playerSpeedMs: 100,
+  score: 0,
+  // player last move tick
+  playerLastMoveAt: 0
 }
+// =================================================
 
+// = Start a game ==================================
+setMap(levels[level])
+setBackground(background)
+
+let playerObject = getFirst(player)
+
+onInput("s", () => {
+  movePlayer(directionsEnum.BOTTOM)
+})
+
+onInput("w", () => {
+  movePlayer(directionsEnum.TOP)
+})
+
+onInput("a", () => {
+  movePlayer(directionsEnum.LEFT)
+})
+
+onInput("d", () => {
+  movePlayer(directionsEnum.RIGHT)
+})
 
 onInput("k", () => {
   if (gameState.bombsToPlant <= 0)
@@ -1049,9 +1091,10 @@ onInput("k", () => {
       for (let coords of explodedCoords) {
         clearTile(...coords)
       }
-    }, gameState.explosionLastsMs)
+    }, explosionLastsMs)
 
     // Change game state
     gameState.bombsToPlant++
-  }, bombTimeoutTime)
+  }, bombTimeoutTimeMs)
 })
+// =================================================
