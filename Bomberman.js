@@ -34,6 +34,21 @@ function isSpriteInBounds(x, y) {
     x < width() && y < height()
 }
 
+// -- Animations
+function animateSprite(animation, animationTimeMs, object, updateObjectCallback) {
+  let animationIdx = 0
+  return setInterval(() => {
+    animationIdx = (animationIdx + 1) % animation.length
+    const nextType = animation[animationIdx]
+
+    const bombCoords = [object.x, object.y]
+
+    object.remove()
+    object = addSpriteWithReturn(...bombCoords, nextType)
+    updateObjectCallback(object)
+  }, animationTimeMs)
+}
+
 // -- Player
 function checkPlayerSpeedLimit() {
   const now = performance.now()
@@ -65,6 +80,7 @@ function movePlayer(direction) {
     playerObject.remove()
     playerObject = null
     gameState.gameOver = true // TODO: remove only a life
+    playTune(soundGameOver)
   }
 
   // Player can collect powerups
@@ -93,6 +109,7 @@ function movePlayer(direction) {
     }
 
     powerupObject.remove()
+    playTune(soundPowerupCollected)
   }
 }
 
@@ -210,6 +227,9 @@ const categoryFire = [fireCross, fireHorizontal, fireVertical, fireL, fireR, fir
 const categoryMonsters = [monster1, monster2, monster3, monster4, monster5]
 const categoryPowerups = [powerupDouble, powerupFlame, powerupBomb, powerupSpeed, powerupRemoteControl, powerupPassThroughBombs]
 const categoryPortals = [portal1, portal2]
+
+// -- This blocks fire in a way that it stops there
+const categoryFireBlockers = [...categoryBlocks, ...categoryCrates]
 // =================================================
 
 // = Animations ====================================
@@ -636,6 +656,7 @@ DDD4400DD00DD40D
   [monster5, bitmap`
 ................
 ................
+................
 ....0.......0...
 ....D0.....0D...
 ...D0D.....D0D..
@@ -648,8 +669,7 @@ D44D444444444D44
 .D44D4444444D44D
 ..DDD4444444DDDD
 D4444DDDDDDD444D
-.DDDD.......DDD.
-................`],
+.DDDD.......DDD.`],
   // Powerups
   [powerupDouble, bitmap`
 ..555555555555..
@@ -1040,6 +1060,25 @@ const soundBombExplodes2 = tune`
 100: G5/100 + B5/100 + A5/100,
 100: B5/100 + A5/100 + G5/100,
 2800`
+// ---- Powerups
+const soundPowerupCollected = tune`
+100: E5^100 + C5/100,
+100: F5^100 + D5/100,
+100: G5^100 + E5/100,
+100: A5^100 + F5/100,
+100: B5^100 + G5/100,
+2700`
+// ---- Game over
+const soundGameOver = tune`
+115.38461538461539: C5/115.38461538461539 + D5-115.38461538461539 + E5~115.38461538461539 + F5^115.38461538461539,
+115.38461538461539: B4/115.38461538461539 + C5-115.38461538461539 + D5~115.38461538461539 + E5^115.38461538461539,
+115.38461538461539: A4/115.38461538461539 + B4-115.38461538461539 + C5~115.38461538461539 + D5^115.38461538461539,
+115.38461538461539: G4/115.38461538461539 + A4-115.38461538461539 + B4~115.38461538461539 + C5^115.38461538461539,
+115.38461538461539: F4/115.38461538461539 + G4-115.38461538461539 + A4~115.38461538461539 + B4^115.38461538461539,
+115.38461538461539: E4/115.38461538461539 + F4-115.38461538461539 + G4~115.38461538461539 + A4^115.38461538461539,
+115.38461538461539: D4/115.38461538461539 + E4-115.38461538461539 + F4~115.38461538461539 + G4^115.38461538461539,
+115.38461538461539: C4/115.38461538461539 + D4-115.38461538461539 + E4~115.38461538461539 + F4^115.38461538461539,
+2769.2307692307695`
 // =================================================
 
 // = Constants =====================================
@@ -1065,9 +1104,17 @@ const directionsFires = {
   [directionsEnum.BOTTOM]: { end: fireB, middle: fireVertical },
 }
 
+// -- Player movement
+const playerMoveControls = {
+  "w": directionsEnum.TOP,
+  "s": directionsEnum.BOTTOM,
+  "a": directionsEnum.LEFT,
+  "d": directionsEnum.RIGHT,
+}
+
 // -- Timeouts
 const bombTimeoutTimeMs = 5000
-const bombAnimationTimeMs = 500
+const bombAnimationTimeMs = 250
 const explosionLastsMs = 500
 // =================================================
 
@@ -1094,22 +1141,13 @@ setMap(levels[level])
 setBackground(background)
 
 let playerObject = getFirst(player)
+// =================================================
 
-onInput("s", () => {
-  movePlayer(directionsEnum.BOTTOM)
-})
-
-onInput("w", () => {
-  movePlayer(directionsEnum.TOP)
-})
-
-onInput("a", () => {
-  movePlayer(directionsEnum.LEFT)
-})
-
-onInput("d", () => {
-  movePlayer(directionsEnum.RIGHT)
-})
+// = Controls ======================================
+for (const control in playerMoveControls)
+  onInput(control, () => {
+    movePlayer(playerMoveControls[control])
+  })
 
 onInput("k", () => {
   if (!playerObject || gameState.gameOver) return
@@ -1123,14 +1161,12 @@ onInput("k", () => {
   playTune(soundBombPlant)
 
   // Play bomb animation
-  let bombAnimationIdx = 0
-  const bombAnimationInterval = setInterval(() => {
-    bombAnimationIdx = (bombAnimationIdx + 1) % animationBomb.length
-    const bombNextType = animationBomb[bombAnimationIdx]
-    const bombCoords = [bombObject.x, bombObject.y]
-    bombObject.remove()
-    bombObject = addSpriteWithReturn(...bombCoords, bombNextType)
-  }, bombAnimationTimeMs)
+  const bombAnimationInterval = animateSprite(
+    animationBomb,
+    bombAnimationTimeMs,
+    bombObject,
+    (newObject) => { bombObject = newObject }
+  )
 
   setTimeout(() => {
     clearInterval(bombAnimationInterval)
