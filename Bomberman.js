@@ -73,6 +73,23 @@ function generateRandomCoordsForPortalAndPowerup() {
   gameState.level.powerupCoords = [crateForPowerup.x, crateForPowerup.y]
 }
 
+// -- Monsters
+function getPossibleMonsterDirections(monsterObject) {
+  let result = []
+
+  for (const direction of Object.values(directionsEnum)) {
+    const coordsToCheck = addCoords([monsterObject.x, monsterObject.y], directionsCoords[direction])
+
+    if (isSpriteInBounds(...coordsToCheck)) {
+      const tileSprites = getTile(...coordsToCheck)
+      if (!tileSprites.some(x => categoryBlocks.includes(x.type) || categoryCrates.includes(x.type) || categoryBombs.includes(x.type)))
+        result.push(direction)
+    }
+  }
+
+  return result
+}
+
 // -- Player
 function checkPlayerSpeedLimit() {
   const now = performance.now()
@@ -194,9 +211,22 @@ function explodeInOneDirection(bombCoords, direction) {
       break
     }
 
+    // Kill enemies
+    if (tileSprites.some(x => categoryMonsters.includes(x.type))) {
+      const monsterObject = tileSprites.find(x => categoryMonsters.includes(x.type))
+      monsterObject.remove()
+    }
+
+    // Kill player
+    if (tileSprites.some(x => x.type === player)) {
+      playerObject.remove()
+      playerObject = null
+      gameState.gameOver = true
+      playTune(soundGameOver)
+    }
+
     // Explode other bomb
-    if (tileSprites.some(x => categoryBombs.includes(x.type)))
-      break
+    if (tileSprites.some(x => categoryBombs.includes(x.type))) {}
 
     addSprite(
       ...newCoords,
@@ -280,6 +310,7 @@ const categoryFireBlockers = [...categoryBlocks, ...categoryCrates]
 
 // = Animations ====================================
 const animationBomb = [bomb1, bomb2, bomb3, bomb2]
+const animationPortal = [portal1, portal2]
 // =================================================
 
 // = Legends, solids, pushables ====================
@@ -1162,6 +1193,9 @@ const playerMoveControls = {
 const bombTimeoutTimeMs = 5000
 const bombAnimationTimeMs = 250
 const explosionLastsMs = 500
+
+// -- Speeds
+const monsterSpeedMs = 1000
 // =================================================
 
 // = Game state ====================================
@@ -1175,8 +1209,15 @@ let gameState = {
     playerLastMoveAt: 0
   },
   level: {
-    portalCoords: [0, 0], // TODO: set randomly under crates,
-    powerupCoords: [0, 0] // TODO: set randomly under crates,
+    portalCoords: [0, 0], // this is set randomly under crates,
+    powerupCoords: [0, 0] // this is set randomly under crates,
+  },
+  monsters: {
+    monster1: [],
+    monster2: [],
+    monster3: [],
+    monster4: [],
+    monster5: [],
   },
   score: 0,
 }
@@ -1188,6 +1229,28 @@ generateRandomCoordsForPortalAndPowerup()
 setBackground(background)
 
 let playerObject = getFirst(player)
+
+gameState.monsters.monster1 = getAll(monster1)
+gameState.monsters.monster2 = getAll(monster2)
+gameState.monsters.monster3 = getAll(monster3)
+gameState.monsters.monster4 = getAll(monster4)
+gameState.monsters.monster5 = getAll(monster5)
+
+// -- Start game loop
+const intervalMonster1 = setInterval(() => {
+  const monsters = gameState.monsters.monster1
+
+  for (const monster of monsters) {
+    const possibleDirections = getPossibleMonsterDirections(monster)
+    if (!possibleDirections.length) continue
+
+    const direction = getRandomItem(possibleDirections)
+    const coords = directionsCoords[direction]
+
+    monster.x += coords[0]
+    monster.y += coords[1]
+  }
+}, monsterSpeedMs)
 // =================================================
 
 // = Controls ======================================
