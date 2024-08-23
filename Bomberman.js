@@ -60,7 +60,7 @@ function animateSprite(animation, animationTimeMs, object, updateObjectCallback)
 }
 
 // -- Levels
-function generateRandomCoordsForPortalAndPowerup() {
+function setRandomCoordsForPortalAndPowerup() {
   const crates = getAll(crate)
   const shuffledCrates = shuffleArray(crates)
 
@@ -69,6 +69,14 @@ function generateRandomCoordsForPortalAndPowerup() {
 
   gameState.level.portalCoords = [crateForPortal.x, crateForPortal.y]
   gameState.level.powerupCoords = [crateForPowerup.x, crateForPowerup.y]
+}
+
+function setAllMonstersToGameState() {
+  gameState.monsters[monster1] = getAll(monster1)
+  gameState.monsters[monster2] = getAll(monster2)
+  gameState.monsters[monster3] = getAll(monster3)
+  gameState.monsters[monster4] = getAll(monster4)
+  gameState.monsters[monster5] = getAll(monster5)
 }
 
 // -- Monsters
@@ -88,6 +96,17 @@ function getPossibleMonsterDirections(monsterObject) {
   return result
 }
 
+function killMonster(monsterObject) {
+  gameState.monsters[monsterObject.type] = gameState.monsters[monsterObject.type].filter(x => x !== monsterObject)
+  monsterObject.remove()
+}
+
+function killMonsters(tileSprites) {
+  const monsterObjects = tileSprites.filter(x => categoryMonsters.includes(x.type))
+  for (const monsterObject of monsterObjects)
+    killMonster(monsterObject)
+}
+
 // -- Player
 function checkPlayerSpeedLimit() {
   const now = performance.now()
@@ -98,6 +117,13 @@ function checkPlayerSpeedLimit() {
   }
 
   return false
+}
+
+function killPlayer() {
+  playerObject.remove()
+  playerObject = null
+  gameState.gameOver = true
+  playTune(soundGameOver)
 }
 
 function movePlayer(direction) {
@@ -116,10 +142,8 @@ function movePlayer(direction) {
   // Explosion and monsters kills player
   if (tileSprites.some(x => categoryFire.includes(x.type)) ||
     tileSprites.some(x => categoryMonsters.includes(x.type))) {
-    playerObject.remove()
-    playerObject = null
-    gameState.gameOver = true // TODO: remove only a life
-    playTune(soundGameOver)
+    killPlayer()
+    return
   }
 
   // Player can collect powerups
@@ -152,7 +176,7 @@ function movePlayer(direction) {
   }
 
   // Player can enter portal if all monsters are killed
-  if (gameState.isPortalAnimated) {
+  if(tileSprites.some(x => categoryPortals.includes(x.type)) && gameState.isPortalAnimated) {
     playTune(melody1) // TODO: change melody to some cool sound
   }
 }
@@ -201,7 +225,7 @@ function explodeInOneDirection(bombCoords, direction) {
       // Remove crate after some time
       setTimeout(() => {
         const crateCoords = [crateObject.x, crateObject.y]
-        crateObject.remove()
+        clearTile(...crateCoords) // Was happening that powerup was placed twice, this should fix it
 
         // Check if there's something underneath
         if (compareCoords(gameState.level.portalCoords, crateCoords))
@@ -216,20 +240,19 @@ function explodeInOneDirection(bombCoords, direction) {
 
     // Kill enemies
     if (tileSprites.some(x => categoryMonsters.includes(x.type))) {
-      const monsterObject = tileSprites.find(x => categoryMonsters.includes(x.type))
-
-      // Remove monster from gameState
-      gameState.monsters[monsterObject.type] = gameState.monsters[monsterObject.type].filter(x => x !== monsterObject)
-
-      monsterObject.remove()
+      killMonsters(tileSprites)
     }
 
     // Kill player
     if (tileSprites.some(x => x.type === player)) {
-      playerObject.remove()
-      playerObject = null
-      gameState.gameOver = true
-      playTune(soundGameOver)
+      killPlayer()
+    }
+
+    // Remove powerups
+    if (tileSprites.some(x => categoryPowerups.includes(x.type))) {
+      const powerupObjects = tileSprites.filter(x => categoryPowerups.includes(x.type))
+      for (const powerupObject of powerupObjects)
+        powerupObject.remove()
     }
 
     // Explode other bomb
@@ -1206,7 +1229,7 @@ const portalAnimationTimeMs = 500
 const gameManagerTimeMs = 50
 
 // -- Speeds
-const monsterSpeedMs = 1000
+const monster1SpeedMs = 1000
 // =================================================
 
 // = Game state ====================================
@@ -1237,16 +1260,11 @@ let gameState = {
 
 // = Start a game ==================================
 setMap(levels[level])
-generateRandomCoordsForPortalAndPowerup()
+setRandomCoordsForPortalAndPowerup()
+setAllMonstersToGameState()
 setBackground(background)
 
 let playerObject = getFirst(player)
-
-gameState.monsters[monster1] = getAll(monster1)
-gameState.monsters[monster2] = getAll(monster2)
-gameState.monsters[monster3] = getAll(monster3)
-gameState.monsters[monster4] = getAll(monster4)
-gameState.monsters[monster5] = getAll(monster5)
 
 // -- Start game loop
 const gameManagerInterval = setInterval(() => {
@@ -1260,6 +1278,7 @@ const gameManagerInterval = setInterval(() => {
   }
 }, gameManagerTimeMs)
 
+// -- Start monster movement
 const intervalMonster1 = setInterval(() => {
   const monsters = gameState.monsters[monster1]
 
@@ -1275,18 +1294,14 @@ const intervalMonster1 = setInterval(() => {
 
     const tileSprites = getTile(monster.x, monster.y)
 
-    if (tileSprites.some(x => x.type === player)) {
-      // TODO: Refactor game over
-      playTune(soundGameOver)
-    }
+    if (tileSprites.some(x => x.type === player))
+      killPlayer()
 
-    if (tileSprites.some(x => categoryFire.includes(x.type))) {
-      // Kill monster
-      gameState.monsters[monster1] = gameState.monsters[monster1].filter(x => x !== monster) // TODO: check if kills only one
-      monster.remove()
-    }
+    // Fire kills monsters
+    if (tileSprites.some(x => categoryFire.includes(x.type)))
+      killMonster(monster)
   }
-}, monsterSpeedMs)
+}, monster1SpeedMs)
 // =================================================
 
 // = Controls ======================================
@@ -1297,6 +1312,10 @@ for (const control in playerMoveControls)
 
 onInput("k", () => {
   if (!playerObject || gameState.gameOver) return
+
+  // Check if there is a bomb already
+  const bomb = getTile(playerObject.x, playerObject.y).find(x => categoryBombs.includes(x.type))
+  if (bomb) return
 
   if (gameState.player.bombsToPlant <= 0)
     return
@@ -1334,7 +1353,12 @@ onInput("k", () => {
     // Hide explosion after some time
     setTimeout(() => {
       for (let coords of explodedCoords) {
-        clearTile(...coords)
+        // Remove only fire sprites (otherwise it would remove also portal for example)
+        const tileSprites = getTile(...coords)
+        for(const sprite of tileSprites) {
+          if(categoryFire.includes(sprite.type))
+            sprite.remove()
+        }
       }
     }, explosionLastsMs)
 
