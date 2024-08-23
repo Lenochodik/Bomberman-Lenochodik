@@ -64,8 +64,6 @@ function generateRandomCoordsForPortalAndPowerup() {
   const crates = getAll(crate)
   const shuffledCrates = shuffleArray(crates)
 
-  console.log(crates, shuffledCrates)
-
   const crateForPortal = shuffledCrates[0]
   const crateForPowerup = shuffledCrates[1]
 
@@ -152,6 +150,11 @@ function movePlayer(direction) {
     powerupObject.remove()
     playTune(soundPowerupCollected)
   }
+
+  // Player can enter portal if all monsters are killed
+  if (gameState.isPortalAnimated) {
+    playTune(melody1) // TODO: change melody to some cool sound
+  }
 }
 
 // -- Coords
@@ -214,6 +217,10 @@ function explodeInOneDirection(bombCoords, direction) {
     // Kill enemies
     if (tileSprites.some(x => categoryMonsters.includes(x.type))) {
       const monsterObject = tileSprites.find(x => categoryMonsters.includes(x.type))
+
+      // Remove monster from gameState
+      gameState.monsters[monsterObject.type] = gameState.monsters[monsterObject.type].filter(x => x !== monsterObject)
+
       monsterObject.remove()
     }
 
@@ -1194,6 +1201,10 @@ const bombTimeoutTimeMs = 5000
 const bombAnimationTimeMs = 250
 const explosionLastsMs = 500
 
+const portalAnimationTimeMs = 500
+
+const gameManagerTimeMs = 50
+
 // -- Speeds
 const monsterSpeedMs = 1000
 // =================================================
@@ -1202,8 +1213,8 @@ const monsterSpeedMs = 1000
 let gameState = {
   gameOver: false,
   player: {
-    bombsToPlant: 1,
-    flameLength: 1,
+    bombsToPlant: 10,
+    flameLength: 3,
     playerSpeedMs: 100,
     // player last move tick
     playerLastMoveAt: 0
@@ -1213,12 +1224,13 @@ let gameState = {
     powerupCoords: [0, 0] // this is set randomly under crates,
   },
   monsters: {
-    monster1: [],
-    monster2: [],
-    monster3: [],
-    monster4: [],
-    monster5: [],
+    [monster1]: [],
+    [monster2]: [],
+    [monster3]: [],
+    [monster4]: [],
+    [monster5]: [],
   },
+  isPortalAnimated: false,
   score: 0,
 }
 // =================================================
@@ -1230,15 +1242,26 @@ setBackground(background)
 
 let playerObject = getFirst(player)
 
-gameState.monsters.monster1 = getAll(monster1)
-gameState.monsters.monster2 = getAll(monster2)
-gameState.monsters.monster3 = getAll(monster3)
-gameState.monsters.monster4 = getAll(monster4)
-gameState.monsters.monster5 = getAll(monster5)
+gameState.monsters[monster1] = getAll(monster1)
+gameState.monsters[monster2] = getAll(monster2)
+gameState.monsters[monster3] = getAll(monster3)
+gameState.monsters[monster4] = getAll(monster4)
+gameState.monsters[monster5] = getAll(monster5)
 
 // -- Start game loop
+const gameManagerInterval = setInterval(() => {
+  // Start portal animation when all monsters are killed and portal is not animated yet
+  if (Object.values(gameState.monsters).flat().length === 0 && !gameState.isPortalAnimated) {
+    let portal = getFirst(portal1) || getFirst(portal2)
+    if (portal) {
+      animateSprite(animationPortal, portalAnimationTimeMs, portal, (newPortal) => { portal = newPortal });
+      gameState.isPortalAnimated = true
+    }
+  }
+}, gameManagerTimeMs)
+
 const intervalMonster1 = setInterval(() => {
-  const monsters = gameState.monsters.monster1
+  const monsters = gameState.monsters[monster1]
 
   for (const monster of monsters) {
     const possibleDirections = getPossibleMonsterDirections(monster)
@@ -1249,6 +1272,19 @@ const intervalMonster1 = setInterval(() => {
 
     monster.x += coords[0]
     monster.y += coords[1]
+
+    const tileSprites = getTile(monster.x, monster.y)
+
+    if (tileSprites.some(x => x.type === player)) {
+      // TODO: Refactor game over
+      playTune(soundGameOver)
+    }
+
+    if (tileSprites.some(x => categoryFire.includes(x.type))) {
+      // Kill monster
+      gameState.monsters[monster1] = gameState.monsters[monster1].filter(x => x !== monster) // TODO: check if kills only one
+      monster.remove()
+    }
   }
 }, monsterSpeedMs)
 // =================================================
