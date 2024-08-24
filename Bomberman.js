@@ -1,7 +1,7 @@
 /*
 @title: Bomberman
 @author: Lenochodik
-@tags: []
+@tags: ['classic', 'bomberman']
 @addedOn: 2024-00-00
 */
 
@@ -48,6 +48,8 @@ function isSpriteInBounds(x, y) {
 
 // -- Game UI
 function drawAllText() {
+  clearText()
+
   addText(`Level ${level+1}`, {
     x: 3,
     y: 0,
@@ -65,6 +67,14 @@ function drawAllText() {
     y: 0,
     color: color`0`
   })
+
+  if (gameState.gameOver) {
+    addText(`Game Over\n press L`, {
+      x: 6,
+      y: Math.round(height() / 2),
+      color: color`0`
+    })
+  }
 }
 
 // -- Animations
@@ -115,6 +125,35 @@ function getPossibleMonsterDirections(monsterObject) {
   }
 
   return result
+}
+
+function moveMonsterInLastDirection(monsterObject) {
+  const possibleDirections = getPossibleMonsterDirections(monsterObject)
+  if (!possibleDirections.length)
+    return
+
+  let currentDirection = monsterObject.currentDirection
+
+  if (!currentDirection || !possibleDirections.includes(currentDirection)) {
+    currentDirection = getRandomItem(possibleDirections)
+    monsterObject.currentDirection = currentDirection
+  }
+  const coords = directionsCoords[currentDirection]
+
+  monsterObject.x += coords[0]
+  monsterObject.y += coords[1]
+}
+
+function moveMonsterRandomly(monsterObject) {
+  const possibleDirections = getPossibleMonsterDirections(monsterObject)
+  if (!possibleDirections.length)
+    return
+
+  const direction = getRandomItem(possibleDirections)
+  const coords = directionsCoords[direction]
+
+  monsterObject.x += coords[0]
+  monsterObject.y += coords[1]
 }
 
 function killMonster(monsterObject) {
@@ -1370,18 +1409,12 @@ const gameManagerInterval = setInterval(() => {
 const intervalMonster1 = setInterval(() => {
   const monsters = gameState.monsters[monster1]
 
-  for (const monster of monsters) {
-    const possibleDirections = getPossibleMonsterDirections(monster)
-    if (!possibleDirections.length) continue
-
-    const direction = getRandomItem(possibleDirections)
-    const coords = directionsCoords[direction]
-
-    monster.x += coords[0]
-    monster.y += coords[1]
+  for (let monster of monsters) {
+    moveMonsterInLastDirection(monster)
 
     const tileSprites = getTile(monster.x, monster.y)
 
+    // Monster kills player
     if (tileSprites.some(x => x.type === player))
       killPlayer()
 
