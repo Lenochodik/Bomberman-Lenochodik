@@ -62,18 +62,25 @@ function drawAllText() {
     color: color`0`
   })
 
-  addText(`HP 3`, {
+  addText(`HP ${gameState.player.lives}`, {
     x: 13,
     y: 0,
     color: color`0`
   })
 
   if (gameState.gameOver) {
-    addText(`Game Over\n press L`, {
-      x: 6,
-      y: Math.round(height() / 2),
-      color: color`0`
-    })
+    if (gameState.player.lives > 0)
+      addText(`You died!\n press L`, {
+        x: 6,
+        y: Math.round(height() / 2),
+        color: color`0`
+      })
+    else
+      addText(`Game over!\n press L`, {
+        x: 5,
+        y: Math.round(height() / 2),
+        color: color`0`
+      })
   }
 }
 
@@ -196,10 +203,19 @@ function checkPlayerSpeedLimit() {
 }
 
 function killPlayer() {
+  // Kill player
   playerObject.remove()
   playerObject = null
   gameState.gameOver = true
   playTune(soundGameOver)
+
+  // Remove some powerups
+  gameState.player.bombsToPlant = 1
+  gameState.player.playerSpeedMs = 100
+
+  // Decrease lives
+  gameState.player.lives--
+  drawAllText()
 }
 
 function movePlayer(direction) {
@@ -254,6 +270,8 @@ function movePlayer(direction) {
   // Player can enter portal if all monsters are killed
   if (tileSprites.some(x => categoryPortals.includes(x.type)) && gameState.isPortalAnimated) {
     playTune(melody1) // TODO: change melody to some cool sound
+
+    playerObject = null // So player can't move anymore
   }
 }
 
@@ -283,13 +301,23 @@ function explodeBomb(bombObject) {
   clearTimeout(gameStateBomb.timeout)
 
   playTune(soundBombExplodes)
-  clearTile(bombObject.x, bombObject.y)
+  const tileSprites = getTile(bombObject.x, bombObject.y)
+  for (const sprite of tileSprites) {
+    if (categoryBombs.includes(sprite.type))
+      sprite.remove()
+  }
 
   // Add fire, explosion
   let explodedCoords = [
     [bombObject.x, bombObject.y]
   ]
+  // Explode in center
   addSprite(bombObject.x, bombObject.y, fireCross)
+  // Kill player
+  if (tileSprites.some(x => x.type === player)) {
+    killPlayer()
+  }
+  // Explode in all directions
   explodedCoords.push(...explodeInOneDirection([bombObject.x, bombObject.y], directionsEnum.LEFT))
   explodedCoords.push(...explodeInOneDirection([bombObject.x, bombObject.y], directionsEnum.RIGHT))
   explodedCoords.push(...explodeInOneDirection([bombObject.x, bombObject.y], directionsEnum.TOP))
@@ -1281,6 +1309,39 @@ const melody1 = tune`
 115.38461538461539,
 115.38461538461539: D5~115.38461538461539,
 115.38461538461539: E5~115.38461538461539`
+const melody2 = tune`
+166.66666666666666: C4~166.66666666666666 + C5/166.66666666666666,
+166.66666666666666: C4~166.66666666666666 + E5/166.66666666666666 + C5-166.66666666666666,
+166.66666666666666: E4^166.66666666666666 + C5/166.66666666666666,
+166.66666666666666: C4~166.66666666666666 + F5/166.66666666666666 + C5-166.66666666666666,
+166.66666666666666: C4~166.66666666666666 + C5/166.66666666666666,
+166.66666666666666: C4~166.66666666666666 + E5/166.66666666666666 + C5-166.66666666666666,
+166.66666666666666: E4^166.66666666666666 + C5/166.66666666666666,
+166.66666666666666: C4~166.66666666666666,
+166.66666666666666: C4~166.66666666666666 + G5/166.66666666666666,
+166.66666666666666: C4~166.66666666666666 + G5/166.66666666666666,
+166.66666666666666: E4^166.66666666666666 + F5/166.66666666666666,
+166.66666666666666: C4~166.66666666666666 + F5/166.66666666666666,
+166.66666666666666: C4~166.66666666666666 + E5/166.66666666666666,
+166.66666666666666: C4~166.66666666666666 + E5/166.66666666666666,
+166.66666666666666: E4^166.66666666666666 + C5/166.66666666666666,
+166.66666666666666: C4~166.66666666666666 + C5/166.66666666666666,
+166.66666666666666: C4~166.66666666666666,
+166.66666666666666: C4~166.66666666666666 + C5/166.66666666666666,
+166.66666666666666: E4^166.66666666666666 + E5/166.66666666666666 + C5-166.66666666666666,
+166.66666666666666: C4~166.66666666666666 + C5/166.66666666666666,
+166.66666666666666: C4~166.66666666666666 + F5/166.66666666666666 + C5-166.66666666666666,
+166.66666666666666: C4~166.66666666666666 + C5/166.66666666666666,
+166.66666666666666: E4^166.66666666666666 + E5/166.66666666666666 + C5-166.66666666666666,
+166.66666666666666: C4~166.66666666666666 + C5/166.66666666666666,
+166.66666666666666: C4~166.66666666666666,
+166.66666666666666: C4~166.66666666666666 + G5/166.66666666666666 + E5/166.66666666666666,
+166.66666666666666: E4^166.66666666666666 + G5/166.66666666666666 + E5/166.66666666666666,
+166.66666666666666: C4~166.66666666666666 + F5/166.66666666666666 + D5-166.66666666666666,
+166.66666666666666: C4~166.66666666666666 + F5/166.66666666666666 + D5-166.66666666666666,
+166.66666666666666: C4~166.66666666666666 + C5/166.66666666666666,
+166.66666666666666: E4^166.66666666666666,
+166.66666666666666: C4~166.66666666666666`
 // -- Sounds
 // ---- Player
 const soundPlayerMove = tune`
@@ -1378,9 +1439,10 @@ const monsterSpeedsMs = {
 // =================================================
 
 // = Game state ====================================
-let gameState = {
+const initialGameState = {
   gameOver: false,
   player: {
+    lives: 3,
     bombsToPlant: 10,
     flameLength: 3,
     playerSpeedMs: 100,
@@ -1405,17 +1467,33 @@ let gameState = {
   isPowerupAnimated: false,
   powerupAnimationInterval: null,
 }
+
+let gameState = JSON.parse(JSON.stringify(initialGameState))
 // =================================================
 
 // = Start a game ==================================
-setMap(levels[level])
-setRandomCoordsForPortalAndPowerup()
-setAllMonstersToGameState()
-setBackground(background)
+let playerObject = null
 
-drawAllText()
+function startLevel() {
+  setMap(levels[level])
+  setRandomCoordsForPortalAndPowerup()
+  setAllMonstersToGameState()
+  setBackground(background)
 
-let playerObject = getFirst(player)
+  // Reset some of the game state
+  gameState.gameOver = false
+  gameState.playerLastMoveAt = 0
+  gameState.bombs = []
+  gameState.score = 0
+  gameState.isPortalAnimated = false
+  gameState.isPowerupAnimated = false
+  gameState.powerupAnimationInterval = false
+
+  playerObject = getFirst(player)
+  drawAllText()
+}
+
+startLevel()
 
 // -- Start game loop
 const gameManagerInterval = setInterval(() => {
@@ -1458,6 +1536,17 @@ for (const control in playerMoveControls)
   onInput(control, () => {
     movePlayer(playerMoveControls[control])
   })
+
+onInput("l", () => {
+  if (playerObject || !gameState.gameOver) return
+
+  if (gameState.player.lives <= 0) {
+    level = 0
+    gameState = JSON.parse(JSON.stringify(initialGameState))
+  }
+
+  startLevel()
+})
 
 onInput("k", () => {
   if (!playerObject || gameState.gameOver) return
