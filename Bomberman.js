@@ -127,6 +127,18 @@ function getPossibleMonsterDirections(monsterObject) {
   return result
 }
 
+function monsterCollisionDetection(monsterObject) {
+  const tileSprites = getTile(monsterObject.x, monsterObject.y)
+
+  // Monster kills player
+  if (tileSprites.some(x => x.type === player))
+    killPlayer()
+
+  // Fire kills monsters
+  if (tileSprites.some(x => categoryFire.includes(x.type)))
+    killMonster(monsterObject)
+}
+
 function moveMonsterInLastDirection(monsterObject) {
   const possibleDirections = getPossibleMonsterDirections(monsterObject)
   if (!possibleDirections.length)
@@ -142,6 +154,8 @@ function moveMonsterInLastDirection(monsterObject) {
 
   monsterObject.x += coords[0]
   monsterObject.y += coords[1]
+
+  monsterCollisionDetection(monsterObject)
 }
 
 function moveMonsterRandomly(monsterObject) {
@@ -154,6 +168,8 @@ function moveMonsterRandomly(monsterObject) {
 
   monsterObject.x += coords[0]
   monsterObject.y += coords[1]
+
+  monsterCollisionDetection(monsterObject)
 }
 
 function killMonster(monsterObject) {
@@ -1207,6 +1223,22 @@ lc...c..c..c.cr
 l.b.bcb.bcb.b.r
 l.......m..c..r
 l.b.b.b.bcb.b.r
+lc.j.cc...c..cr
+l.b.bcb.b.b.b.r
+li..c....!.c..r
+l.bcb.bcbcbcb.r
+l.c.c.c.c(...cr
+bbbbbbbbbbbbbbb`,
+  map`
+MLLLLLLLLLLLLL,
+NXXXXXXXXXXXXXB
+nbbbbbbbbbbbbbg
+lp.....c....ccr
+l.bcbcb.b.b.bcr
+lc...c..c..c.cr
+l.b.bcb.bcb.b.r
+l.......m..c..r
+l.b.b.b.bcb.b.r
 lc...cc...c..cr
 lmb.bcb.bmb.b.r
 l...c......c..r
@@ -1336,7 +1368,13 @@ const crateAnimationTimeMs = 500
 const gameManagerTimeMs = 50
 
 // -- Speeds
-const monster1SpeedMs = 1000
+const monsterSpeedsMs = {
+  [monster1]: 1000,
+  [monster2]: 750,
+  [monster3]: 500,
+  [monster4]: 250,
+  [monster5]: 125,
+}
 // =================================================
 
 // = Game state ====================================
@@ -1406,23 +1444,13 @@ const gameManagerInterval = setInterval(() => {
 }, gameManagerTimeMs)
 
 // -- Start monster movement
-const intervalMonster1 = setInterval(() => {
-  const monsters = gameState.monsters[monster1]
-
-  for (let monster of monsters) {
-    moveMonsterInLastDirection(monster)
-
-    const tileSprites = getTile(monster.x, monster.y)
-
-    // Monster kills player
-    if (tileSprites.some(x => x.type === player))
-      killPlayer()
-
-    // Fire kills monsters
-    if (tileSprites.some(x => categoryFire.includes(x.type)))
-      killMonster(monster)
-  }
-}, monster1SpeedMs)
+for (const monsterType of categoryMonsters) {
+  // TODO: save interval
+  const interval = setInterval(() => {
+    for (let monsterObject of gameState.monsters[monsterType])
+      moveMonsterInLastDirection(monsterObject)
+  }, monsterSpeedsMs[monsterType])
+}
 // =================================================
 
 // = Controls ======================================
