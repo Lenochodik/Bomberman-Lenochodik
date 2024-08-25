@@ -73,13 +73,13 @@ function drawAllText() {
       addText(`You died!\n press L`, {
         x: 6,
         y: Math.round(height() / 2),
-        color: color`0`
+        color: color`2`
       })
     else
       addText(`Game over!\n press L`, {
         x: 5,
         y: Math.round(height() / 2),
-        color: color`0`
+        color: color`2`
       })
   }
 }
@@ -1419,7 +1419,7 @@ const playerMoveControls = {
 }
 
 // -- Timeouts
-const bombTimeoutTimeMs = 5000
+const bombTimeoutTimeMs = 4000
 const bombAnimationTimeMs = 250
 const explosionLastsMs = 500
 
@@ -1443,8 +1443,11 @@ const initialGameState = {
   gameOver: false,
   player: {
     lives: 3,
-    bombsToPlant: 10,
-    flameLength: 3,
+    bombsToPlant: 1,
+    flameLength: 1,
+    // Only for testing:
+    // bombsToPlant: 10,
+    // flameLength: 3,
     playerSpeedMs: 100,
     // player last move tick
     playerLastMoveAt: 0
