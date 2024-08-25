@@ -30,3 +30,5 @@ Nice to have features, I'll be working on:
 - [ ] Exploding portal should spawn enemies
 - [ ] Improve movement of stronger monster
 - [ ] Add level loading screen
+- [ ] Count score
+- [ ] Add death sprites for monsters?
