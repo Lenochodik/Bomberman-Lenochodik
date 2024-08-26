@@ -230,7 +230,7 @@ function killPlayer() {
   gameState.player.playerSpeedMs = 100
   gameState.player.hasRemoteControl = false
   gameState.player.canPassThroughBombs = false
-  gameState.player.canPassThroughWalls = false
+  gameState.player.canPassThroughCrates = false
 
   // Decrease lives
   gameState.player.lives--
@@ -241,15 +241,28 @@ function movePlayer(direction) {
   if (!playerObject || gameState.gameOver) return
   if (!checkPlayerSpeedLimit()) return
 
+  // Check solids that doesn't have to be solids (because of powerups)
   const [dx, dy] = directionsCoords[direction]
+  const newCoords = [playerObject.x + dx, playerObject.y + dy]
+  const tileSprites = getTile(...newCoords)
+
+  // Player cannot pass through bombs (only with powerups)
+  if (tileSprites.some(x => categoryBombs.includes(x.type) &&
+      !gameState.player.canPassThroughBombs))
+    return
+
+  // Player cannot pass through walls (only with powerups)
+  if (tileSprites.some(x => categoryBlocks.includes(x.type) || categoryCrates.includes(x.type)) &&
+    !gameState.player.canPassThroughCrates)
+    return
+
+
   playerObject.x += dx
   playerObject.y += dy
 
   playTune(soundPlayerMove)
 
   // Check new tile
-  const tileSprites = getTile(playerObject.x, playerObject.y)
-
   // Explosion and monsters kills player
   if (tileSprites.some(x => categoryFire.includes(x.type)) ||
     tileSprites.some(x => categoryMonsters.includes(x.type))) {
@@ -279,6 +292,9 @@ function movePlayer(direction) {
         break
       case powerupPassThroughBombs:
         gameState.player.canPassThroughBombs = true
+        break
+      case powerupPassThroughCrates:
+        gameState.player.canPassThroughCrates = true
         break
     }
 
@@ -484,6 +500,7 @@ const powerupBomb = "D"
 const powerupSpeed = "F"
 const powerupRemoteControl = "/"
 const powerupPassThroughBombs = ":"
+const powerupPassThroughCrates = "+"
 // Portals
 const portal1 = "H"
 const portal2 = "Y"
@@ -506,7 +523,7 @@ const categoryBlocks = [block, blockL, blockR, blockCorner1, blockCorner2, block
 const categoryCrates = [crate, crateExplosion]
 const categoryFire = [fireCross, fireHorizontal, fireVertical, fireL, fireR, fireT, fireB]
 const categoryMonsters = [monster1, monster2, monster3, monster4, monster5]
-const categoryPowerups = [powerupDouble, powerupFlame, powerupBomb, powerupSpeed, powerupRemoteControl, powerupPassThroughBombs]
+const categoryPowerups = [powerupDouble, powerupFlame, powerupBomb, powerupSpeed, powerupRemoteControl, powerupPassThroughBombs, powerupPassThroughCrates]
 const categoryPortals = [portal1, portal2]
 // =================================================
 
@@ -1139,6 +1156,23 @@ C3333CCCCCCC333C
 55L500000L115755
 .55LL0000005555.
 ..555555555555..`],
+  [powerupPassThroughCrates, bitmap`
+..555555555555..
+.55555555577755.
+55FFFFFFFF722755
+55FF666666662275
+55F6FFFFFFFF6725
+55F6F6F66F6L1F75
+55F6F6F66F6F6F55
+55F6F6F66FLL1115
+55F6F6F66F6F6F55
+55F6F6F66LLL1115
+55F6F6F66F6F6F25
+55F6FFFLLLL11115
+55FF66666666FF25
+55FFFFFFFL111115
+.55555555555555.
+..555555555555..`],
   // Portals
   [portal1, bitmap`
 0000000000000000
@@ -1334,12 +1368,8 @@ C3333CCCCCCC333C
 setSolids([
   // Player
   player,
-  // Bombs
-  bomb1, bomb2, bomb3,
   // Blocks
   block, blockL, blockR, blockCorner1, blockCorner2, blockCornerTR, blockCornerTL,
-  // Crates
-  crate, crateExplosion
 ])
 
 setPushables({
@@ -1565,7 +1595,7 @@ const initialGameState = {
     flameLength: 1,
     hasRemoteControl: false,
     canPassThroughBombs: false,
-    canPassThroughWalls: false,
+    canPassThroughCrates: false,
     // Only for testing:
     // bombsToPlant: 10,
     // flameLength: 3,
@@ -1677,7 +1707,7 @@ onInput("l", () => {
 // Remote control powerup
 onInput("j", () => {
   if (!playerObject || gameState.gameOver || !gameState.player.hasRemoteControl) return
-  if(!gameState.bombs.length) return
+  if (!gameState.bombs.length) return
 
   explodeBomb(gameState.bombs[0].object)
 })
@@ -1711,7 +1741,7 @@ onInput("k", () => {
 
   // Explode bomb after some time (if player doesn't have remote control)
   let bombTimeout = null;
-  if(!gameState.player.hasRemoteControl) {
+  if (!gameState.player.hasRemoteControl) {
     bombTimeout = setTimeout(() => {
       explodeBomb(bombObject)
     }, bombTimeoutTimeMs)
