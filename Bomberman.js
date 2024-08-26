@@ -1380,6 +1380,176 @@ setPushables({
 // = Levels ========================================
 let level = 0
 const levels = [
+  // Level 1 - powerup: flame
+  map`
+MLLLLLLLLLLLLL,
+NXXXXXXXXXXXXXB
+nbbbbbbbbbbbbbg
+lp.....c....ccr
+l.bcbcb.b.b.bcr
+lc...c..c..c.cr
+l.b.bcb.bcb.b.r
+l.......m..c.mr
+l.b.b.b.bcb.b.r
+lc.m.cc...c..cr
+l.b.bcb.b.b.b.r
+l...c..m...c..r
+l.bcb.bcbcbcb.r
+l.c.c.c.c....cr
+bbbbbbbbbbbbbbb`,
+  // Level 2 - powerup: bomb
+  map`
+MLLLLLLLLLLLLL,
+NXXXXXXXXXXXXXB
+nbbbbbbbbbbbbbg
+lp.....c.i..ccr
+l.bcbcb.b.b.bcr
+lc...c..c..c.cr
+l.b.bcb.bcb.b.r
+l.......m..c..r
+l.b.b.b.bcb.b.r
+lc.m.cc...c..cr
+l.b.bcb.b.b.b.r
+l...c......c..r
+l.bcb.bcbcbcb.r
+l.c.c.c.c.i..cr
+bbbbbbbbbbbbbbb`,
+    // Level 3 - powerup: speed
+  map`
+MLLLLLLLLLLLLL,
+NXXXXXXXXXXXXXB
+nbbbbbbbbbbbbbg
+lp.....c.i..c.r
+l.bcbcb.b.b.bcr
+lc.j..c.c..c..r
+l.b.b.b.bcb.b.r
+l..c..c....c.jr
+l.b.b.b.bcb.b.r
+l..c..c.m.cc.cr
+l.b.bcb.b.b.b.r
+l..mc......c..r
+l.bcb.bcbcbcb.r
+l.c.c.c.c.i.ccr
+bbbbbbbbbbbbbbb`,
+  // Level 4 - powerup: remote control
+  map`
+MLLLLLLLLLLLLL,
+NXXXXXXXXXXXXXB
+nbbbbbbbbbbbbbg
+lp.....c.!.c..r
+l.bcbcb.b.b.b.r
+lc...c..c..c.cr
+l.b.bcb.bcb.b.r
+lj.........c..r
+l.b.b.b.bcb.b.r
+lc...cc.i.c..cr
+l.b.bcb.b.b.b.r
+l.cmc........jr
+l.bcb.bcbcbcb.r
+lccic.c.c.!cccr
+bbbbbbbbbbbbbbb`,
+  // Level 5 - powerup: pass through bombs
+  map`
+MLLLLLLLLLLLLL,
+NXXXXXXXXXXXXXB
+nbbbbbbbbbbbbbg
+lp.....c.!..ccr
+l.bcbcb.b.b.bcr
+lc...c..c..c.cr
+l.b.bcb.bcb.b.r
+l....!.....c.jr
+l.b.b.b.bcb.b.r
+lc...cc...c..cr
+l.b.bcb.b.b.b.r
+li..c......c.jr
+l.bcb.bcbcbcb.r
+l.cic.c.c.(..cr
+bbbbbbbbbbbbbbb`,
+    // Level 6 - powerup: HP +1
+  map`
+MLLLLLLLLLLLLL,
+NXXXXXXXXXXXXXB
+nbbbbbbbbbbbbbg
+lp......c(....r
+l.bcbcb.b.b.b.r
+lc...c..c..c.cr
+l.b.bcb.bcb.b.r
+l.....ci...c.!r
+l.b.b.bcbcb.b.r
+lc.!.cc...c..cr
+l.b.bcb.b.b.b.r
+l...c......c.jr
+l.bcb.bcbcbcb.r
+l.cjc.c.c.(..cr
+bbbbbbbbbbbbbbb`,
+    // Level 7 - powerup: flame
+  map`
+MLLLLLLLLLLLLL,
+NXXXXXXXXXXXXXB
+nbbbbbbbbbbbbbg
+lp.....c....ccr
+l.bcbcb.b!b.bcr
+lc...c..c..c.cr
+l.b.bcb.bcb.b.r
+l..!.......c.(r
+l.b.b.b.bcb.b.r
+lc...cc...c..cr
+l.b.bcb.b.b.b.r
+l...c......c.(r
+l.bcb.bcbcbcb.r
+l.c(c.c.c.(..cr
+bbbbbbbbbbbbbbb`,
+      // Level 8 - powerup: pass through walls
+  map`
+MLLLLLLLLLLLLL,
+NXXXXXXXXXXXXXB
+nbbbbbbbbbbbbbg
+lp..cic.....c.r
+l.bcbcb.b!b.bcr
+lc...c..c..c.cr
+l.b.bcb.bcb.b.r
+l..(.......c.(r
+l.b.b.b.bcb.b.r
+lc...cc...c..cr
+l.b.bcb.b.b.b.r
+l...c......c.(r
+l.bcb.bcbcbcb.r
+l.c!c.cmc.(..cr
+bbbbbbbbbbbbbbb`,
+        // Level 9 - powerup: bomb
+  map`
+MLLLLLLLLLLLLL,
+NXXXXXXXXXXXXXB
+nbbbbbbbbbbbbbg
+lp.....c....c.r
+l.bcbcb.b!b.bcr
+lc...c..c..cjcr
+l.b.bcb.bcbib.r
+l..!.......c.(r
+l.b.b.b.bcb.b.r
+lc...cc...c..cr
+l.b.bcb.b.b.b.r
+lmmmc......c.(r
+l.bcb.bcbcbcb.r
+l.c(c.cjc.(..cr
+bbbbbbbbbbbbbbb`,
+        // Level 10 - BOSS FIGHT
+  map`
+MLLLLLLLLLLLLL,
+NXXXXXXXXXXXXXB
+nbbbbbbbbbbbbbg
+lp............r
+l.bbb.b.b.bbbmr
+l.bj.j.j.j.jb.r
+l.b.bbb.bbb.bmr
+l...b(...(b...r
+l.b!b.bcb.b!bmr
+l...b(...(b...r
+l.b.bbb.bbb.bmr
+l.bi.i.i.i.ib.r
+l.bbb.b.b.bbbmr
+l.m.m.m.m.m.m.r
+bbbbbbbbbbbbbbb`,
   map`
 MLLLLLLLLLLLLL,
 NXXXXXXXXXXXXXB
@@ -1395,23 +1565,7 @@ l.b.bcb.b.b.b.r
 li..c....!.c..r
 l.bcb.bcbcbcb.r
 l.c.c.c.c(...cr
-bbbbbbbbbbbbbbb`,
-  map`
-MLLLLLLLLLLLLL,
-NXXXXXXXXXXXXXB
-nbbbbbbbbbbbbbg
-lp.....c....ccr
-l.bcbcb.b.b.bcr
-lc...c..c..c.cr
-l.b.bcb.bcb.b.r
-l.......m..c..r
-l.b.b.b.bcb.b.r
-lc...cc...c..cr
-lmb.bcb.bmb.b.r
-l...c......c..r
-l.bcb.bcbcbcb.r
-l.c.c.c.c....cr
-bbbbbbbbbbbbbbb`
+bbbbbbbbbbbbbbb`, // TESTING LEVEL
 ]
 // =================================================
 
