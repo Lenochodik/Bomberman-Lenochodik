@@ -181,7 +181,9 @@ function moveMonsterRandomly(monsterObject) {
 
 function killMonster(monsterObject) {
   gameState.monsters[monsterObject.type] = gameState.monsters[monsterObject.type].filter(x => x !== monsterObject)
+  const burntMonsterObject = addSpriteWithReturn(monsterObject.x, monsterObject.y, monstersBurntSprites[monsterObject.type])
   monsterObject.remove()
+  setTimeout(() => burntMonsterObject.remove(), burntMonsterLastsMs)
 }
 
 function killMonsters(tileSprites) {
@@ -202,6 +204,18 @@ function checkPlayerSpeedLimit() {
   return false
 }
 
+// TODO: check this function in the future, it was causing some bugs
+// function checkPlayerBombSpeedLimit() {
+//   const now = performance.now()
+
+//   if (now - gameState.player.playerLastBombAt >= gameState.player.playerSpeedMs / 2) {
+//     gameState.player.playerLastBombAt = now
+//     return true
+//   }
+
+//   return false
+// }
+
 function killPlayer() {
   // Kill player
   playerObject.remove()
@@ -211,6 +225,7 @@ function killPlayer() {
 
   // Remove some powerups
   gameState.player.bombsToPlant = 1
+  gameState.player.flameLength = 1
   gameState.player.playerSpeedMs = 100
 
   // Decrease lives
@@ -313,7 +328,7 @@ function explodeBomb(bombObject) {
   ]
   // Explode in center
   addSprite(bombObject.x, bombObject.y, fireCross)
-  // Kill player
+  // Kill player in the center
   if (tileSprites.some(x => x.type === player)) {
     killPlayer()
   }
@@ -489,9 +504,6 @@ const categoryFire = [fireCross, fireHorizontal, fireVertical, fireL, fireR, fir
 const categoryMonsters = [monster1, monster2, monster3, monster4, monster5]
 const categoryPowerups = [powerupDouble, powerupFlame, powerupBomb, powerupSpeed, powerupRemoteControl, powerupPassThroughBombs]
 const categoryPortals = [portal1, portal2]
-
-// -- This blocks fire in a way that it stops there
-const categoryFireBlockers = [...categoryBlocks, ...categoryCrates]
 // =================================================
 
 // = Animations ====================================
@@ -1515,19 +1527,28 @@ const playerMoveControls = {
 const bombTimeoutTimeMs = 4000
 const bombAnimationTimeMs = 250
 const explosionLastsMs = 500
+const burntMonsterLastsMs = 1350
 
 const portalAnimationTimeMs = 500
 const crateAnimationTimeMs = 500
 
 const gameManagerTimeMs = 50
 
-// -- Speeds
+// -- Monsters
 const monsterSpeedsMs = {
   [monster1]: 1000,
   [monster2]: 750,
   [monster3]: 500,
   [monster4]: 250,
   [monster5]: 125,
+}
+
+const monstersBurntSprites = {
+  [monster1]: burntMonster1,
+  [monster2]: burntMonster2,
+  [monster3]: burntMonster3,
+  [monster4]: burntMonster4,
+  [monster5]: burntMonster5,
 }
 // =================================================
 
@@ -1543,7 +1564,8 @@ const initialGameState = {
     // flameLength: 3,
     playerSpeedMs: 100,
     // player last move tick
-    playerLastMoveAt: 0
+    playerLastMoveAt: 0,
+    // playerLastBombAt: 0, // TODO: in the future?
   },
   level: {
     portalCoords: [0, 0], // this is set randomly under crates,
@@ -1579,6 +1601,7 @@ function startLevel() {
   // Reset some of the game state
   gameState.gameOver = false
   gameState.playerLastMoveAt = 0
+  // gameState.playerLastBombAt = 0 // TODO: in the future?
   gameState.bombs = []
   gameState.score = 0
   gameState.isPortalAnimated = false
@@ -1650,6 +1673,10 @@ onInput("k", () => {
   // Check if there is a bomb already
   const bomb = getTile(playerObject.x, playerObject.y).find(x => categoryBombs.includes(x.type))
   if (bomb) return
+
+  // Hopefully fix bug with player planting bombs before decreasing bombsToPlant limit
+  // TODO: this causes other bugs as not restoring bombsToPlant limit properly
+  // if (!checkPlayerBombSpeedLimit()) return
 
   if (gameState.player.bombsToPlant <= 0)
     return
