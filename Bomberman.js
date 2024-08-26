@@ -185,6 +185,8 @@ function killMonster(monsterObject) {
   gameState.monsters[monsterObject.type] = gameState.monsters[monsterObject.type].filter(x => x !== monsterObject)
   const burntMonsterObject = addSpriteWithReturn(monsterObject.x, monsterObject.y, monstersBurntSprites[monsterObject.type])
   monsterObject.remove()
+  
+  // Animate burnt monster
   setTimeout(() => burntMonsterObject.remove(), burntMonsterLastsMs)
 
   gameState.score += monstersScores[monsterObject.type]
@@ -237,7 +239,8 @@ function killPlayer() {
   gameState.player.hasRemoteControl = false
   gameState.player.canPassThroughBombs = false
   gameState.player.canPassThroughCrates = false
-  gameState.player.score = 0
+  // Reset score
+  gameState.score = 0
 
   // Decrease lives
   gameState.player.lives--
@@ -312,7 +315,7 @@ function movePlayer(direction) {
   }
 
   // Player can enter portal if all monsters are killed
-  if (tileSprites.some(x => categoryPortals.includes(x.type)) && gameState.isPortalAnimated) {
+  if (tileSprites.some(x => categoryPortals.includes(x.type)) && gameState.portalAnimationInterval !== null) {
     playTune(melody2) // TODO: change melody to some cool sound
 
     playerObject = null // So player can't move anymore
@@ -410,10 +413,13 @@ function explodeInOneDirection(bombCoords, direction) {
 
     // Crate breaks and stops fire
     if (tileSprites.some(x => categoryCrates.includes(x.type))) { // TODO: only crate without explosion?
-      // Replace crate object
-      if (gameState.isPowerupAnimated)
+      // If coords are the same as powerup, stop the animation
+      if (compareCoords(gameState.level.powerupCoords, newCoords) && gameState.powerupAnimationInterval !== null) {
         clearInterval(gameState.powerupAnimationInterval)
+        gameState.powerupAnimationInterval = null
+      }
 
+      // Replace crate object
       let crateObject = tileSprites.find(x => categoryCrates.includes(x.type))
       crateObject.remove()
       crateObject = addSpriteWithReturn(crateObject.x, crateObject.y, crateExplosion)
@@ -1811,9 +1817,8 @@ const initialGameState = {
   score: 0,
   currentPowerupLevelIndex: 0,
   // Helper states
-  isPortalAnimated: false,
-  isPowerupAnimated: false,
   powerupAnimationInterval: null,
+  portalAnimationInterval: null,
 }
 
 let gameState = JSON.parse(JSON.stringify(initialGameState))
@@ -1823,6 +1828,19 @@ let gameState = JSON.parse(JSON.stringify(initialGameState))
 let playerObject = null
 
 function startLevel() {
+  // Stop all timeouts and intervals
+  // -- Stop bombs
+  for (const bomb of gameState.bombs) {
+    clearTimeout(bomb.timeout)
+    clearInterval(bomb.animationInterval)
+  }
+  // -- Stop powerup animation and portal animation
+  clearInterval(gameState.powerupAnimationInterval)
+  gameState.powerupAnimationInterval = null
+  clearInterval(gameState.portalAnimationInterval)
+  gameState.portalAnimationInterval = null
+
+  // Set new level map and generate new coords for portal and powerup
   setMap(levels[level])
   setRandomCoordsForPortalAndPowerup()
   setAllMonstersToGameState()
@@ -1833,10 +1851,6 @@ function startLevel() {
   gameState.playerLastMoveAt = 0
   // gameState.playerLastBombAt = 0 // TODO: in the future?
   gameState.bombs = []
-  gameState.score = 0
-  gameState.isPortalAnimated = false
-  gameState.isPowerupAnimated = false
-  gameState.powerupAnimationInterval = false
 
   playerObject = getFirst(player)
   drawAllText()
@@ -1848,23 +1862,23 @@ startLevel()
 const gameManagerInterval = setInterval(() => {
   // Start portal animation when all monsters are killed and portal is not animated yet
   if (Object.values(gameState.monsters).flat().length === 0) {
-    if (!gameState.isPortalAnimated) {
-      let portalObject = getFirst(portal1) || getFirst(portal2)
-      if (portalObject) {
-        animateSprite(animationPortal, portalAnimationTimeMs, portalObject, (newObject) => { portalObject = newObject });
-        gameState.isPortalAnimated = true
+    if (gameState.portalAnimationInterval === null) {
+      const portalCoords = gameState.level.portalCoords
+      const tileSprites = getTile(...portalCoords)
+      if (tileSprites.some(x => categoryPortals.includes(x.type))) {
+        let portalObject = tileSprites.find(x => categoryPortals.includes(x.type))
+        gameState.portalAnimationInterval = animateSprite(animationPortal, portalAnimationTimeMs, portalObject, (newObject) => { portalObject = newObject });
       }
     }
 
     // Animate crate so player knows there is a powerup (after all monsters are killed)
-    if (!gameState.isPowerupAnimated) {
+    if (gameState.powerupAnimationInterval === null) {
       const powerupCoords = gameState.level.powerupCoords
       const tileSprites = getTile(...powerupCoords)
 
       if (tileSprites.some(x => x.type === crate)) {
         let crateObject = tileSprites.find(x => x.type === crate)
         gameState.powerupAnimationInterval = animateSprite(animationCrate, crateAnimationTimeMs, crateObject, (newObject) => { crateObject = newObject });
-        gameState.isPowerupAnimated = true
       }
     }
   }
@@ -1872,8 +1886,7 @@ const gameManagerInterval = setInterval(() => {
 
 // -- Start monster movement
 for (const monsterType of categoryMonsters) {
-  // TODO: save interval
-  const interval = setInterval(() => {
+  setInterval(() => {
     for (let monsterObject of gameState.monsters[monsterType])
       moveMonsterInLastDirection(monsterObject)
   }, monsterSpeedsMs[monsterType])
