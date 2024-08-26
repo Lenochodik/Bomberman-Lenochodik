@@ -103,10 +103,12 @@ function setRandomCoordsForPortalAndPowerup() {
   const shuffledCrates = shuffleArray(crates)
 
   const crateForPortal = shuffledCrates[0]
-  const crateForPowerup = shuffledCrates[1]
-
   gameState.level.portalCoords = [crateForPortal.x, crateForPortal.y]
-  gameState.level.powerupCoords = [crateForPowerup.x, crateForPowerup.y]
+
+  if (gameState.currentPowerupLevelIndex < powerupsOrder.length || shuffledCrates.length <= 1) { // No more powerup in boss level
+    const crateForPowerup = shuffledCrates[1]
+    gameState.level.powerupCoords = [crateForPowerup.x, crateForPowerup.y]
+  }
 }
 
 function setAllMonstersToGameState() {
@@ -184,6 +186,9 @@ function killMonster(monsterObject) {
   const burntMonsterObject = addSpriteWithReturn(monsterObject.x, monsterObject.y, monstersBurntSprites[monsterObject.type])
   monsterObject.remove()
   setTimeout(() => burntMonsterObject.remove(), burntMonsterLastsMs)
+
+  gameState.score += monstersScores[monsterObject.type]
+  drawAllText()
 }
 
 function killMonsters(tileSprites) {
@@ -224,13 +229,15 @@ function killPlayer() {
   playTune(soundGameOver)
 
   // TODO: move this to restarting new level??
-  // Remove some powerups
+  // Remove all powerups
+  gameState.currentPowerupLevelIndex = 0
   gameState.player.bombsToPlant = 1
   gameState.player.flameLength = 1
   gameState.player.playerSpeedMs = 100
   gameState.player.hasRemoteControl = false
   gameState.player.canPassThroughBombs = false
   gameState.player.canPassThroughCrates = false
+  gameState.player.score = 0
 
   // Decrease lives
   gameState.player.lives--
@@ -275,8 +282,9 @@ function movePlayer(direction) {
     const powerupObject = tileSprites.find(x => categoryPowerups.includes(x.type))
 
     switch (powerupObject.type) {
-      case powerupDouble:
-        // TODO
+      case powerupPlusHP:
+        gameState.player.lives++
+        drawAllText()
         break
       case powerupFlame:
         gameState.player.flameLength++
@@ -300,13 +308,20 @@ function movePlayer(direction) {
 
     powerupObject.remove()
     playTune(soundPowerupCollected)
+    gameState.currentPowerupLevelIndex++
   }
 
   // Player can enter portal if all monsters are killed
   if (tileSprites.some(x => categoryPortals.includes(x.type)) && gameState.isPortalAnimated) {
-    playTune(melody1) // TODO: change melody to some cool sound
+    playTune(melody2) // TODO: change melody to some cool sound
 
     playerObject = null // So player can't move anymore
+
+    // Move to next level
+    setTimeout(() => {
+      level++
+      startLevel()
+    }, nextLevelTimeoutMs)
   }
 }
 
@@ -413,7 +428,7 @@ function explodeInOneDirection(bombCoords, direction) {
           addSprite(...crateCoords, portal1)
 
         if (compareCoords(gameState.level.powerupCoords, crateCoords))
-          addSprite(...crateCoords, powerupFlame) // TODO: set powerup per level
+          addSprite(...crateCoords, powerupsOrder[gameState.currentPowerupLevelIndex])
 
       }, explosionLastsMs)
       break
@@ -494,7 +509,7 @@ const burntMonster3 = "-"
 const burntMonster4 = "?"
 const burntMonster5 = "<"
 // Powerups
-const powerupDouble = "A"
+const powerupPlusHP = "A"
 const powerupFlame = "S"
 const powerupBomb = "D"
 const powerupSpeed = "F"
@@ -523,7 +538,7 @@ const categoryBlocks = [block, blockL, blockR, blockCorner1, blockCorner2, block
 const categoryCrates = [crate, crateExplosion]
 const categoryFire = [fireCross, fireHorizontal, fireVertical, fireL, fireR, fireT, fireB]
 const categoryMonsters = [monster1, monster2, monster3, monster4, monster5]
-const categoryPowerups = [powerupDouble, powerupFlame, powerupBomb, powerupSpeed, powerupRemoteControl, powerupPassThroughBombs, powerupPassThroughCrates]
+const categoryPowerups = [powerupPlusHP, powerupFlame, powerupBomb, powerupSpeed, powerupRemoteControl, powerupPassThroughBombs, powerupPassThroughCrates]
 const categoryPortals = [portal1, portal2]
 // =================================================
 
@@ -1054,22 +1069,22 @@ C33C333333333C33
 C3333CCCCCCC333C
 .CCCC.......CCC.`],
   // Powerups
-  [powerupDouble, bitmap`
+  [powerupPlusHP, bitmap`
 ..555555555555..
 .55555557577755.
 5555555555522555
-5555566665552275
-5555665566557725
-5555655556555575
-555555556F555575
-5555555565555555
-55555566F5555555
-555556F555655655
-55556F5555566555
-5L566555555F6575
-5L56FFFFF5F55655
-5L55555555552755
-.5LL55555572255.
+555CC55555CC2275
+55CCCCCCCCCCC725
+55CCCCCCCCCCC575
+555C0200020C5575
+555CC20002CC5565
+555CC22022CC5665
+5555C00200C65565
+55555CCCCC666565
+5L55CCCCCCC65565
+5L55CCCCCCC55666
+5L5CCCCCCCCC2755
+.5LLCCCCCC72255.
 ..5LLLL5555555..`],
   [powerupFlame, bitmap`
 ..555555555555..
@@ -1414,7 +1429,7 @@ l...c......c..r
 l.bcb.bcbcbcb.r
 l.c.c.c.c.i..cr
 bbbbbbbbbbbbbbb`,
-    // Level 3 - powerup: speed
+  // Level 3 - powerup: speed
   map`
 MLLLLLLLLLLLLL,
 NXXXXXXXXXXXXXB
@@ -1465,7 +1480,7 @@ li..c......c.jr
 l.bcb.bcbcbcb.r
 l.cic.c.c.(..cr
 bbbbbbbbbbbbbbb`,
-    // Level 6 - powerup: HP +1
+  // Level 6 - powerup: HP +1
   map`
 MLLLLLLLLLLLLL,
 NXXXXXXXXXXXXXB
@@ -1482,7 +1497,7 @@ l...c......c.jr
 l.bcb.bcbcbcb.r
 l.cjc.c.c.(..cr
 bbbbbbbbbbbbbbb`,
-    // Level 7 - powerup: flame
+  // Level 7 - powerup: flame
   map`
 MLLLLLLLLLLLLL,
 NXXXXXXXXXXXXXB
@@ -1499,7 +1514,7 @@ l...c......c.(r
 l.bcb.bcbcbcb.r
 l.c(c.c.c.(..cr
 bbbbbbbbbbbbbbb`,
-      // Level 8 - powerup: pass through walls
+  // Level 8 - powerup: pass through crates
   map`
 MLLLLLLLLLLLLL,
 NXXXXXXXXXXXXXB
@@ -1516,7 +1531,7 @@ l...c......c.(r
 l.bcb.bcbcbcb.r
 l.c!c.cmc.(..cr
 bbbbbbbbbbbbbbb`,
-        // Level 9 - powerup: bomb
+  // Level 9 - powerup: bomb
   map`
 MLLLLLLLLLLLLL,
 NXXXXXXXXXXXXXB
@@ -1533,7 +1548,7 @@ lmmmc......c.(r
 l.bcb.bcbcbcb.r
 l.c(c.cjc.(..cr
 bbbbbbbbbbbbbbb`,
-        // Level 10 - BOSS FIGHT
+  // Level 10 - BOSS FIGHT
   map`
 MLLLLLLLLLLLLL,
 NXXXXXXXXXXXXXB
@@ -1720,7 +1735,9 @@ const burntMonsterLastsMs = 1350
 const portalAnimationTimeMs = 500
 const crateAnimationTimeMs = 500
 
-const gameManagerTimeMs = 50
+const gameManagerTimeMs = 200
+
+const nextLevelTimeoutMs = 5500
 
 // -- Monsters
 const monsterSpeedsMs = {
@@ -1738,6 +1755,27 @@ const monstersBurntSprites = {
   [monster4]: burntMonster4,
   [monster5]: burntMonster5,
 }
+
+const monstersScores = {
+  [monster1]: 500,
+  [monster2]: 1000,
+  [monster3]: 1500,
+  [monster4]: 2500,
+  [monster5]: 5000,
+}
+
+// -- Powerups
+const powerupsOrder = [
+  powerupFlame,
+  powerupBomb,
+  powerupSpeed,
+  powerupRemoteControl,
+  powerupPassThroughBombs,
+  powerupPlusHP,
+  powerupFlame,
+  powerupPassThroughCrates,
+  powerupBomb,
+]
 // =================================================
 
 // = Game state ====================================
@@ -1771,6 +1809,7 @@ const initialGameState = {
   },
   bombs: [],
   score: 0,
+  currentPowerupLevelIndex: 0,
   // Helper states
   isPortalAnimated: false,
   isPowerupAnimated: false,
