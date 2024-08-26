@@ -223,10 +223,14 @@ function killPlayer() {
   gameState.gameOver = true
   playTune(soundGameOver)
 
+  // TODO: move this to restarting new level??
   // Remove some powerups
   gameState.player.bombsToPlant = 1
   gameState.player.flameLength = 1
   gameState.player.playerSpeedMs = 100
+  gameState.player.hasRemoteControl = false
+  gameState.player.canPassThroughBombs = false
+  gameState.player.canPassThroughWalls = false
 
   // Decrease lives
   gameState.player.lives--
@@ -271,10 +275,10 @@ function movePlayer(direction) {
         gameState.player.playerSpeedMs = 50
         break
       case powerupRemoteControl:
-        // TODO
+        gameState.player.hasRemoteControl = true
         break
       case powerupPassThroughBombs:
-        // TODO
+        gameState.player.canPassThroughBombs = true
         break
     }
 
@@ -1559,6 +1563,9 @@ const initialGameState = {
     lives: 3,
     bombsToPlant: 1,
     flameLength: 1,
+    hasRemoteControl: false,
+    canPassThroughBombs: false,
+    canPassThroughWalls: false,
     // Only for testing:
     // bombsToPlant: 10,
     // flameLength: 3,
@@ -1667,6 +1674,14 @@ onInput("l", () => {
   startLevel()
 })
 
+// Remote control powerup
+onInput("j", () => {
+  if (!playerObject || gameState.gameOver || !gameState.player.hasRemoteControl) return
+  if(!gameState.bombs.length) return
+
+  explodeBomb(gameState.bombs[0].object)
+})
+
 onInput("k", () => {
   if (!playerObject || gameState.gameOver) return
 
@@ -1694,9 +1709,13 @@ onInput("k", () => {
     (newObject) => { bombObject = newObject }
   )
 
-  const bombTimeout = setTimeout(() => {
-    explodeBomb(bombObject)
-  }, bombTimeoutTimeMs)
+  // Explode bomb after some time (if player doesn't have remote control)
+  let bombTimeout = null;
+  if(!gameState.player.hasRemoteControl) {
+    bombTimeout = setTimeout(() => {
+      explodeBomb(bombObject)
+    }, bombTimeoutTimeMs)
+  }
 
   // Remember bomb position and timeouts
   gameState.bombs.push({
