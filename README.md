@@ -25,10 +25,10 @@ You can play game in current state here: [https://sprig.hackclub.com/share/QNsIA
 Game is still in progress, but first level is playable so you can experience it.
 
 Nice to have features, I'll be working on:
-- [ ] Add more levels
-- [ ] Add more powerups
+- [x] Add more levels
+- [x] Add more powerups
 - [ ] Exploding portal should spawn enemies
 - [ ] Improve movement of stronger monster
-- [ ] Add level loading screen
-- [ ] Count score
-- [ ] Add death sprites for monsters?
+- [x] ~Add level loading screen~
+- [x] Count score
+- [x] Add death sprites for monsters
