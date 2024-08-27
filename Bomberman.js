@@ -212,7 +212,7 @@ function moveMonsterOnEachCrossroad(monsterObject) {
   else if (possibleDirections.length > 2) {
     // Remove opposite direction from possible directions if it's there
     const oppositeDirection = oppositeDirections[currentDirection]
-    if(possibleDirections.includes(oppositeDirection))
+    if (possibleDirections.includes(oppositeDirection))
       possibleDirections.splice(possibleDirections.indexOf(oppositeDirection), 1)
     currentDirection = getRandomItem(possibleDirections)
     monsterObject.currentDirection = currentDirection
@@ -243,7 +243,7 @@ function killMonster(monsterObject) {
   gameState.monsters[monsterObject.type] = gameState.monsters[monsterObject.type].filter(x => x !== monsterObject)
   const burntMonsterObject = addSpriteWithReturn(monsterObject.x, monsterObject.y, monstersBurntSprites[monsterObject.type])
   monsterObject.remove()
-  
+
   // Animate burnt monster
   setTimeout(() => burntMonsterObject.remove(), burntMonsterLastsMs)
 
@@ -270,6 +270,12 @@ function checkPlayerSpeedLimit() {
 }
 
 function killPlayer() {
+  // Replace player with killed player sprite
+  const playerKilledObject = addSpriteWithReturn(playerObject.x, playerObject.y, playerKilled)
+  setTimeout(() => {
+    playerKilledObject.remove()
+  }, playerKilledLastsMs)
+
   // Kill player
   playerObject.remove()
   playerObject = null
@@ -518,7 +524,7 @@ function explodeInOneDirection(bombCoords, direction) {
         }
 
         // Stop portal animation as portal is not active after monsters are killed again
-        if(gameState.portalAnimationInterval !== null) {
+        if (gameState.portalAnimationInterval !== null) {
           clearInterval(gameState.portalAnimationInterval)
           gameState.portalAnimationInterval = null
 
@@ -547,6 +553,10 @@ function explodeInOneDirection(bombCoords, direction) {
 // = Types =========================================
 // Player
 const player = "p"
+const playerKilled = "9"
+const playerL = "8"
+const playerR = "7"
+const playerT = "6"
 // Bombs
 const bomb1 = "1"
 const bomb2 = "2"
@@ -576,7 +586,6 @@ const monster2 = "i"
 const monster3 = "j"
 const monster4 = "!"
 const monster5 = "("
-
 
 const burntMonster1 = "´"
 const burntMonster2 = "_"
@@ -644,6 +653,74 @@ CC...CCCCC...F..
 ....CCCCCC000000
 ....LC...CL0000.
 ...LLL...LLL....`],
+  [playerL, bitmap`
+..........CC....
+..6....CCCC8C...
+.696..CCCCCCC...
+.63..020CCCC....
+..00.02CCCCC....
+..00..0CCCCC9...
+..C0..CCCCC.F...
+..CC.CCCCCCF....
+...CC22CC00FL...
+....C22200010C..
+.....2220000CC..
+.....222000CC0..
+.....22C000000..
+......CCC0000...
+......LC..LC....
+.....LLL.LLL....`],
+  [playerR, bitmap`
+....CC..........
+...C8CCCC....6..
+...CCCCCCC..696.
+....CCCC020..36.
+....CCCCC20.00..
+...9CCCCC0..00..
+...F.CCCCC..0C..
+....FCCCCCC.CC..
+...LF00CC22CC...
+..C01000222C....
+..CC0000222.....
+..0CC000222.....
+..000000C22.....
+...0000CCC......
+....CL..CL......
+....LLL.LLL.....`],
+  [playerT, bitmap`
+....CC.....CC...
+...CCCCCCCCCCC.6
+...CCCCCCCCCCC69
+....CCCCCCCCC..3
+....CCCCCCCCC.00
+....CCCCCCCCC.00
+..9..CCCCCCC..0C
+..F...CCCCC...CC
+...F.CCCCCCC.CC.
+.LLF0CCCCCCCCCC.
+LL20CCCCCCCCCC..
+LC0CC0CCCCCCC...
+LCCC00CCCCCCC...
+000000CCCCCC....
+.0000LC...CL....
+....LLL...LLL...`],
+  [playerKilled, bitmap`
+...33.....33....
+6.333L333L333...
+9633L33333L33...
+3..3C2CCC2C3....
+LL.332CCC233....
+LL.3322C2233....
+3L..3CC2CC3..9..
+33...33333...F..
+.33.3333333.F...
+.3333399933LF11.
+..33399999LLL211
+...3399999LLLL21
+...3339993LLLLL1
+....333333LLLLLL
+....C3...3CLLLL.
+...CCC...CCC....`],
   // Bombs
   [bomb1, bitmap`
 .......6........
@@ -1795,6 +1872,7 @@ const bombTimeoutTimeMs = 4000
 const bombAnimationTimeMs = 250
 const explosionLastsMs = 500
 const burntMonsterLastsMs = 1350
+const playerKilledLastsMs = 1350
 
 const portalAnimationTimeMs = 500
 const crateAnimationTimeMs = 500
@@ -1916,8 +1994,7 @@ function startLevel() {
   if (level !== lastLevelIndex) { // Last map is a final screen, no need to set player
     playerObject = getFirst(player)
     drawAllText()
-  }
-  else {
+  } else {
     // Final level - YOU WIN!
     playerObject = null
     drawYouWinText()
@@ -1972,7 +2049,7 @@ const gameManagerInterval = setInterval(() => {
 for (const monsterType of categoryMonsters) {
   setInterval(() => {
     for (let monsterObject of gameState.monsters[monsterType]) {
-      switch(monsterType) {
+      switch (monsterType) {
         case monster4:
           moveMonsterOnEachCrossroad(monsterObject)
           break
