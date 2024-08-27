@@ -78,15 +78,46 @@ function drawAllText() {
   }
 }
 
+function drawYouWinText() {
+  clearText()
+
+  addText(`!Congrats!`, {
+    x: 5,
+    y: 5,
+    color: color`6`
+  })
+
+  addText(`winner`, {
+    x: 7,
+    y: 6,
+    color: color`6`
+  })
+
+  addText(`with score`, {
+    x: 5,
+    y: 9,
+    color: color`5`
+  })
+
+  const scoreMaxLength = 10
+  const scoreString = gameState.score.toString()
+  // Pad left and right with almost same amount of spaces
+  const leftSpaces = Math.floor((scoreMaxLength - scoreString.length) / 2)
+
+  addText(`${scoreString.padStart(leftSpaces + scoreString.length, ">").padEnd(scoreMaxLength, "<")}`, {
+    x: 5,
+    y: 10,
+    color: color`0`
+  })
+}
+
 // -- Animations
 function animateSprite(animation, animationTimeMs, object, updateObjectCallback) {
   let animationIdx = 0
   return setInterval(() => {
-    // Get next sprite (type) from animation array
     animationIdx = (animationIdx + 1) % animation.length
     const nextType = animation[animationIdx]
 
-    // Remove current sprite and add new one
     object.remove()
     object = addSpriteWithReturn(object.x, object.y, nextType)
     updateObjectCallback(object)
@@ -95,16 +126,13 @@ function animateSprite(animation, animationTimeMs, object, updateObjectCallback)
 
 // -- Levels
 function setRandomCoordsForPortalAndPowerup() {
-  // Get all crates and shuffle them
   const crates = getAll(crate)
   const shuffledCrates = shuffleArray(crates)
 
-  // Set portal coords
   const crateForPortal = shuffledCrates[0]
   gameState.level.portalCoords = [crateForPortal.x, crateForPortal.y]
 
-  // Set powerup coords
-  if (gameState.currentPowerupLevelIndex < powerupsOrder.length && shuffledCrates.length >= 2) { // No more powerup in boss level or if there's only 1 crate
+  if (gameState.currentPowerupLevelIndex < powerupsOrder.length && shuffledCrates.length >= 2) { // No more powerup in boss level
     const crateForPowerup = shuffledCrates[1]
     gameState.level.powerupCoords = [crateForPowerup.x, crateForPowerup.y]
   }
@@ -122,13 +150,10 @@ function setAllMonstersToGameState() {
 function getPossibleMonsterDirections(monsterObject) {
   let result = []
 
-  // Iterate through all directions
   for (const direction of Object.values(directionsEnum)) {
     const coordsToCheck = addCoords([monsterObject.x, monsterObject.y], directionsCoords[direction])
 
-    // Check if sprite is in bounds of the level
     if (isSpriteInBounds(...coordsToCheck)) {
-      // Check if there's no block, crate or bomb
       const tileSprites = getTile(...coordsToCheck)
       if (!tileSprites.some(x => categoryBlocks.includes(x.type) || categoryCrates.includes(x.type) || categoryBombs.includes(x.type)))
         result.push(direction)
@@ -200,24 +225,33 @@ function moveMonsterOnEachCrossroad(monsterObject) {
   monsterCollisionDetection(monsterObject)
 }
 
-function killMonster(monsterObject) {
-  // Update monsters in the game state
-  gameState.monsters[monsterObject.type] = gameState.monsters[monsterObject.type].filter(x => x !== monsterObject)
+function moveMonsterRandomly(monsterObject) {
+  const possibleDirections = getPossibleMonsterDirections(monsterObject)
+  if (!possibleDirections.length)
+    return
 
-  // Add burnt monster sprite and remove alive monster sprite
+  const direction = getRandomItem(possibleDirections)
+  const coords = directionsCoords[direction]
+
+  monsterObject.x += coords[0]
+  monsterObject.y += coords[1]
+
+  monsterCollisionDetection(monsterObject)
+}
+
+function killMonster(monsterObject) {
+  gameState.monsters[monsterObject.type] = gameState.monsters[monsterObject.type].filter(x => x !== monsterObject)
   const burntMonsterObject = addSpriteWithReturn(monsterObject.x, monsterObject.y, monstersBurntSprites[monsterObject.type])
   monsterObject.remove()
   
   // Animate burnt monster
   setTimeout(() => burntMonsterObject.remove(), burntMonsterLastsMs)
 
-  // Update score and redraw text with score
   gameState.score += monstersScores[monsterObject.type]
   drawAllText()
 }
 
 function killMonsters(tileSprites) {
-  // Kill all monsters on the given tile
   const monsterObjects = tileSprites.filter(x => categoryMonsters.includes(x.type))
   for (const monsterObject of monsterObjects)
     killMonster(monsterObject)
@@ -227,7 +261,6 @@ function killMonsters(tileSprites) {
 function checkPlayerSpeedLimit() {
   const now = performance.now()
 
-  // Check if elapsed time is greater than player speed limit
   if (now - gameState.player.playerLastMoveAt >= gameState.player.playerSpeedMs) {
     gameState.player.playerLastMoveAt = now
     return true
@@ -255,6 +288,7 @@ function killPlayer() {
   gameState.gameOver = true
   playTune(soundGameOver)
 
+  // TODO: move this to restarting new level??
   // Remove all powerups
   gameState.currentPowerupLevelIndex = 0
   gameState.player.bombsToPlant = 1
@@ -263,9 +297,10 @@ function killPlayer() {
   gameState.player.hasRemoteControl = false
   gameState.player.canPassThroughBombs = false
   gameState.player.canPassThroughCrates = false
-  
-  // Reset score and decrease lives
+  // Reset score
   gameState.score = 0
+
+  // Decrease lives
   gameState.player.lives--
   drawAllText()
 }
@@ -339,11 +374,11 @@ function movePlayer(direction) {
 
   // Player can enter portal if all monsters are killed
   if (tileSprites.some(x => categoryPortals.includes(x.type)) && gameState.portalAnimationInterval !== null) {
-    playTune(melodyNextLevel)
+    playTune(melody2) // TODO: change melody to some cool sound
 
     playerObject = null // So player can't move anymore
 
-    // Move to next level after some time
+    // Move to next level
     setTimeout(() => {
       level++
       startLevel()
@@ -373,13 +408,10 @@ function explodeBomb(bombObject) {
   const bombIndex = gameState.bombs.findIndex(x => compareCoords([x.object.x, x.object.y], [bombObject.x, bombObject.y]))
   const gameStateBomb = gameState.bombs[bombIndex]
 
-  // Stop animation and detonation timeout (so it doesn't explode twice)
   clearInterval(gameStateBomb.animationInterval)
   clearTimeout(gameStateBomb.timeout)
 
   playTune(soundBombExplodes)
-
-  // Remove bomb sprite
   const tileSprites = getTile(bombObject.x, bombObject.y)
   for (const sprite of tileSprites) {
     if (categoryBombs.includes(sprite.type))
@@ -425,7 +457,6 @@ function explodeInOneDirection(bombCoords, direction) {
   const directionCoords = directionsCoords[direction]
   const { end: fireEnd, middle: fireMiddle } = directionsFires[direction]
 
-  // Explode in one direction for the steps of flame length (or until it hits block or crate)
   for (let i = 1; i <= gameState.player.flameLength; i++) {
     const newCoords = addCoords(bombCoords, multiplyCoords(directionCoords, i))
 
@@ -439,7 +470,7 @@ function explodeInOneDirection(bombCoords, direction) {
       break
 
     // Crate breaks and stops fire
-    if (tileSprites.some(x => categoryCrates.includes(x.type))) {
+    if (tileSprites.some(x => categoryCrates.includes(x.type))) { // TODO: only crate without explosion?
       // If coords are the same as powerup, stop the animation
       if (compareCoords(gameState.level.powerupCoords, newCoords) && gameState.powerupAnimationInterval !== null) {
         clearInterval(gameState.powerupAnimationInterval)
@@ -490,7 +521,6 @@ function explodeInOneDirection(bombCoords, direction) {
       explodeBomb(bombObject)
     }
 
-    // Add fire sprite
     addSprite(
       ...newCoords,
       i === gameState.player.flameLength ? fireEnd : fireMiddle
@@ -564,6 +594,7 @@ const borderTL = "M"
 const borderTR = ","
 // Backgrounds
 const background = "*"
+const backgroundBlue = "P"
 // =================================================
 
 // = Type categories ===============================
@@ -1411,7 +1442,24 @@ C3333CCCCCCC333C
 1111111111111111
 1111111111111111
 1111111111111111
-1111111111111111`]
+1111111111111111`],
+  [backgroundBlue, bitmap`
+7777777777777777
+7777777777777777
+7777777777777777
+7777777777777777
+7777777777777777
+7777777777777777
+7777777777777777
+7777777777777777
+7777777777777777
+7777777777777777
+7777777777777777
+7777777777777777
+7777777777777777
+7777777777777777
+7777777777777777
+7777777777777777`]
 )
 
 setSolids([
@@ -1599,28 +1647,54 @@ l.bi.i.i.i.ib.r
 l.bbb.b.b.bbbmr
 l.m.m.m.m.m.m.r
 bbbbbbbbbbbbbbb`,
+  // Final screen - YOU WIN!
   map`
-MLLLLLLLLLLLLL,
-NXXXXXXXXXXXXXB
-nbbbbbbbbbbbbbg
-lp.....c....ccr
-l.bcbcb.b.b.bcr
-lc...c..c..c.cr
-l.b.bcb.bcb.b.r
-l.......m..c..r
-l.b.b.b.bcb.b.r
-lc.j.cc...c..cr
-l.b.bcb.b.b.b.r
-li..c....!.c..r
-l.bcb.bcbcbcb.r
-l.c.c.c.c(...cr
-bbbbbbbbbbbbbbb`, // TESTING LEVEL
+nbbbbbbbbbg
+lp.mij!(.Hr
+l.MLLLLL,.r
+l.CPPPPPV.r
+l.CPPPPPV.r
+l.CPPPPPV.r
+l.NXXXXXB.r
+l1.´_-?<.1r
+bbbbbbbbbbb`, // TESTING LEVEL
 ]
 // =================================================
 
 // = Melodies, sounds ==============================
 // -- Melodies
-const melodyNextLevel = tune`
+const melody1 = tune`
+115.38461538461539: C5~115.38461538461539,
+115.38461538461539: E5~115.38461538461539,
+115.38461538461539: C5~115.38461538461539,
+115.38461538461539: D5~115.38461538461539,
+115.38461538461539: E5~115.38461538461539,
+115.38461538461539,
+115.38461538461539: D5~115.38461538461539,
+115.38461538461539: E5~115.38461538461539,
+115.38461538461539: D5~115.38461538461539,
+115.38461538461539: C5~115.38461538461539,
+230.76923076923077,
+115.38461538461539: C5~115.38461538461539,
+115.38461538461539: E5~115.38461538461539,
+115.38461538461539: C5~115.38461538461539,
+115.38461538461539: D5~115.38461538461539,
+115.38461538461539: E5~115.38461538461539,
+115.38461538461539,
+115.38461538461539: D5~115.38461538461539,
+115.38461538461539: E5~115.38461538461539,
+115.38461538461539: D5~115.38461538461539,
+115.38461538461539: C5~115.38461538461539,
+230.76923076923077,
+115.38461538461539: C5~115.38461538461539,
+115.38461538461539: E5~115.38461538461539,
+115.38461538461539: C5~115.38461538461539,
+115.38461538461539: D5~115.38461538461539,
+115.38461538461539: E5~115.38461538461539,
+115.38461538461539,
+115.38461538461539: D5~115.38461538461539,
+115.38461538461539: E5~115.38461538461539`
+const melody2 = tune`
 166.66666666666666: C4~166.66666666666666 + C5/166.66666666666666,
 166.66666666666666: C4~166.66666666666666 + E5/166.66666666666666 + C5-166.66666666666666,
 166.66666666666666: E4^166.66666666666666 + C5/166.66666666666666,
@@ -1786,6 +1860,9 @@ const powerupsOrder = [
   powerupPassThroughCrates,
   powerupBomb,
 ]
+
+// -- Levels
+const lastLevelIndex = levels.length - 1
 // =================================================
 
 // = Game state ====================================
@@ -1825,7 +1902,6 @@ const initialGameState = {
   portalAnimationInterval: null,
 }
 
-// Deep copy of initialGameState
 let gameState = JSON.parse(JSON.stringify(initialGameState))
 // =================================================
 
@@ -1839,7 +1915,6 @@ function startLevel() {
     clearTimeout(bomb.timeout)
     clearInterval(bomb.animationInterval)
   }
-
   // -- Stop powerup animation and portal animation
   clearInterval(gameState.powerupAnimationInterval)
   gameState.powerupAnimationInterval = null
@@ -1848,8 +1923,10 @@ function startLevel() {
 
   // Set new level map and generate new coords for portal and powerup
   setMap(levels[level])
-  setRandomCoordsForPortalAndPowerup()
-  setAllMonstersToGameState()
+  if (level !== lastLevelIndex) { // Last map is a final screen, no need to set portal and powerup
+    setRandomCoordsForPortalAndPowerup()
+    setAllMonstersToGameState()
+  }
   setBackground(background)
 
   // Reset some of the game state
@@ -1858,11 +1935,31 @@ function startLevel() {
   // gameState.playerLastBombAt = 0 // TODO: in the future?
   gameState.bombs = []
 
-  // Set player object
-  playerObject = getFirst(player)
+  if (level !== lastLevelIndex) { // Last map is a final screen, no need to set player
+    playerObject = getFirst(player)
+    drawAllText()
+  }
+  else {
+    // Final level - YOU WIN!
+    playerObject = null
+    drawYouWinText()
 
-  // Draw text
-  drawAllText()
+    // Animation only as decorations
+    // -- Animate portals
+    const portalsObjects = getAll(portal1)
+    for (let portalObject of portalsObjects)
+      animateSprite(animationPortal, portalAnimationTimeMs, portalObject, (newObject) => { portalObject = newObject });
+
+    // -- Animate bombs
+    const bombsObjects = getAll(bomb1)
+    for (let bombObject of bombsObjects)
+      animateSprite(animationBomb, bombAnimationTimeMs, bombObject, (newObject) => { bombObject = newObject });
+
+    // -- Animate crates
+    const cratesObjects = getAll(crate)
+    for (let crateObject of cratesObjects)
+      animateSprite(animationCrate, crateAnimationTimeMs, crateObject, (newObject) => { crateObject = newObject });
+  }
 }
 
 startLevel()
@@ -1871,11 +1968,9 @@ startLevel()
 const gameManagerInterval = setInterval(() => {
   // Start portal animation when all monsters are killed and portal is not animated yet
   if (Object.values(gameState.monsters).flat().length === 0) {
-    // Animate portal if it's not animated yet - so player knows he can go to the next level
     if (gameState.portalAnimationInterval === null) {
       const portalCoords = gameState.level.portalCoords
       const tileSprites = getTile(...portalCoords)
-
       if (tileSprites.some(x => categoryPortals.includes(x.type))) {
         let portalObject = tileSprites.find(x => categoryPortals.includes(x.type))
         gameState.portalAnimationInterval = animateSprite(animationPortal, portalAnimationTimeMs, portalObject, (newObject) => { portalObject = newObject });
@@ -1901,7 +1996,6 @@ for (const monsterType of categoryMonsters) {
     for (let monsterObject of gameState.monsters[monsterType]) {
       switch(monsterType) {
         case monster4:
-        case monster5:
           moveMonsterOnEachCrossroad(monsterObject)
           break
         default:
@@ -1913,16 +2007,15 @@ for (const monsterType of categoryMonsters) {
 // =================================================
 
 // = Controls ======================================
-// -- Player movement
 for (const control in playerMoveControls)
   onInput(control, () => {
     movePlayer(playerMoveControls[control])
   })
 
-// -- Restart game
 onInput("l", () => {
   if (playerObject || !gameState.gameOver) return
 
+  // Total game over - start from level 1, reset whole game state
   if (gameState.player.lives <= 0) {
     level = 0
     gameState = JSON.parse(JSON.stringify(initialGameState))
@@ -1931,7 +2024,7 @@ onInput("l", () => {
   startLevel()
 })
 
-// -- Remote control powerup
+// Remote control powerup
 onInput("j", () => {
   if (!playerObject || gameState.gameOver || !gameState.player.hasRemoteControl) return
   if (!gameState.bombs.length) return
@@ -1939,7 +2032,6 @@ onInput("j", () => {
   explodeBomb(gameState.bombs[0].object)
 })
 
-// -- Bomb planting
 onInput("k", () => {
   if (!playerObject || gameState.gameOver) return
 
@@ -1951,7 +2043,6 @@ onInput("k", () => {
   // TODO: this causes other bugs as not restoring bombsToPlant limit properly
   // if (!checkPlayerBombSpeedLimit()) return
 
-  // Check if player has enough bombs to plant
   if (gameState.player.bombsToPlant <= 0)
     return
   gameState.player.bombsToPlant--
