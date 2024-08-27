@@ -269,18 +269,6 @@ function checkPlayerSpeedLimit() {
   return false
 }
 
-// TODO: check this function in the future, it was causing some bugs
-// function checkPlayerBombSpeedLimit() {
-//   const now = performance.now()
-
-//   if (now - gameState.player.playerLastBombAt >= gameState.player.playerSpeedMs / 2) {
-//     gameState.player.playerLastBombAt = now
-//     return true
-//   }
-
-//   return false
-// }
-
 function killPlayer() {
   // Kill player
   playerObject.remove()
@@ -288,7 +276,6 @@ function killPlayer() {
   gameState.gameOver = true
   playTune(soundGameOver)
 
-  // TODO: move this to restarting new level??
   // Remove all powerups
   gameState.currentPowerupLevelIndex = 0
   gameState.player.bombsToPlant = 1
@@ -374,7 +361,7 @@ function movePlayer(direction) {
 
   // Player can enter portal if all monsters are killed
   if (tileSprites.some(x => categoryPortals.includes(x.type)) && gameState.portalAnimationInterval !== null) {
-    playTune(melody2) // TODO: change melody to some cool sound
+    playTune(melodyNextLevel)
 
     playerObject = null // So player can't move anymore
 
@@ -470,7 +457,7 @@ function explodeInOneDirection(bombCoords, direction) {
       break
 
     // Crate breaks and stops fire
-    if (tileSprites.some(x => categoryCrates.includes(x.type))) { // TODO: only crate without explosion?
+    if (tileSprites.some(x => categoryCrates.includes(x.type))) { // Even crate-explosion sprite as it can be animated as revealing powerup
       // If coords are the same as powerup, stop the animation
       if (compareCoords(gameState.level.powerupCoords, newCoords) && gameState.powerupAnimationInterval !== null) {
         clearInterval(gameState.powerupAnimationInterval)
@@ -519,6 +506,30 @@ function explodeInOneDirection(bombCoords, direction) {
     if (tileSprites.some(x => categoryBombs.includes(x.type))) {
       const bombObject = tileSprites.find(x => categoryBombs.includes(x.type))
       explodeBomb(bombObject)
+    }
+
+    // Exploding portal spawns new monsters!
+    if (tileSprites.some(x => categoryPortals.includes(x.type))) {
+      // Wait for explosion to finish, otherwise monsters could spawn into the explosion
+      setTimeout(() => {
+        for (let i = 0; i < 4; i++) {
+          const newMonsterObject = addSpriteWithReturn(...newCoords, monster4)
+          gameState.monsters[monster4].push(newMonsterObject)
+        }
+
+        // Stop portal animation as portal is not active after monsters are killed again
+        if(gameState.portalAnimationInterval !== null) {
+          clearInterval(gameState.portalAnimationInterval)
+          gameState.portalAnimationInterval = null
+
+          // Remove portal
+          const portalObject = tileSprites.find(x => categoryPortals.includes(x.type))
+          portalObject.remove()
+
+          // Add new portal
+          addSprite(portalObject.x, portalObject.y, portal1)
+        }
+      }, explosionLastsMs)
     }
 
     addSprite(
@@ -1657,44 +1668,13 @@ l.CPPPPPV.r
 l.CPPPPPV.r
 l.NXXXXXB.r
 l1.´_-?<.1r
-bbbbbbbbbbb`, // TESTING LEVEL
+bbbbbbbbbbb`,
 ]
 // =================================================
 
 // = Melodies, sounds ==============================
 // -- Melodies
-const melody1 = tune`
-115.38461538461539: C5~115.38461538461539,
-115.38461538461539: E5~115.38461538461539,
-115.38461538461539: C5~115.38461538461539,
-115.38461538461539: D5~115.38461538461539,
-115.38461538461539: E5~115.38461538461539,
-115.38461538461539,
-115.38461538461539: D5~115.38461538461539,
-115.38461538461539: E5~115.38461538461539,
-115.38461538461539: D5~115.38461538461539,
-115.38461538461539: C5~115.38461538461539,
-230.76923076923077,
-115.38461538461539: C5~115.38461538461539,
-115.38461538461539: E5~115.38461538461539,
-115.38461538461539: C5~115.38461538461539,
-115.38461538461539: D5~115.38461538461539,
-115.38461538461539: E5~115.38461538461539,
-115.38461538461539,
-115.38461538461539: D5~115.38461538461539,
-115.38461538461539: E5~115.38461538461539,
-115.38461538461539: D5~115.38461538461539,
-115.38461538461539: C5~115.38461538461539,
-230.76923076923077,
-115.38461538461539: C5~115.38461538461539,
-115.38461538461539: E5~115.38461538461539,
-115.38461538461539: C5~115.38461538461539,
-115.38461538461539: D5~115.38461538461539,
-115.38461538461539: E5~115.38461538461539,
-115.38461538461539,
-115.38461538461539: D5~115.38461538461539,
-115.38461538461539: E5~115.38461538461539`
-const melody2 = tune`
+const melodyNextLevel = tune`
 166.66666666666666: C4~166.66666666666666 + C5/166.66666666666666,
 166.66666666666666: C4~166.66666666666666 + E5/166.66666666666666 + C5-166.66666666666666,
 166.66666666666666: E4^166.66666666666666 + C5/166.66666666666666,
@@ -1881,7 +1861,6 @@ const initialGameState = {
     playerSpeedMs: 100,
     // player last move tick
     playerLastMoveAt: 0,
-    // playerLastBombAt: 0, // TODO: in the future?
   },
   level: {
     portalCoords: [0, 0], // this is set randomly under crates,
@@ -1932,7 +1911,6 @@ function startLevel() {
   // Reset some of the game state
   gameState.gameOver = false
   gameState.playerLastMoveAt = 0
-  // gameState.playerLastBombAt = 0 // TODO: in the future?
   gameState.bombs = []
 
   if (level !== lastLevelIndex) { // Last map is a final screen, no need to set player
@@ -2038,10 +2016,6 @@ onInput("k", () => {
   // Check if there is a bomb already
   const bomb = getTile(playerObject.x, playerObject.y).find(x => categoryBombs.includes(x.type))
   if (bomb) return
-
-  // Hopefully fix bug with player planting bombs before decreasing bombsToPlant limit
-  // TODO: this causes other bugs as not restoring bombsToPlant limit properly
-  // if (!checkPlayerBombSpeedLimit()) return
 
   if (gameState.player.bombsToPlant <= 0)
     return
