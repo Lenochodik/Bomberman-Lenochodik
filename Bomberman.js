@@ -29,12 +29,6 @@ function shuffleArray(arr) {
   return arr;
 }
 
-
-// -- Timing
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
-
 // -- Sprig
 function addSpriteWithReturn(x, y, spriteType) {
   addSprite(x, y, spriteType)
@@ -105,7 +99,7 @@ function setRandomCoordsForPortalAndPowerup() {
   const crateForPortal = shuffledCrates[0]
   gameState.level.portalCoords = [crateForPortal.x, crateForPortal.y]
 
-  if (gameState.currentPowerupLevelIndex < powerupsOrder.length || shuffledCrates.length <= 1) { // No more powerup in boss level
+  if (gameState.currentPowerupLevelIndex < powerupsOrder.length && shuffledCrates.length >= 2) { // No more powerup in boss level
     const crateForPowerup = shuffledCrates[1]
     gameState.level.powerupCoords = [crateForPowerup.x, crateForPowerup.y]
   }
@@ -149,18 +143,49 @@ function monsterCollisionDetection(monsterObject) {
 }
 
 function moveMonsterInLastDirection(monsterObject) {
+  // Get possible direcitons
   const possibleDirections = getPossibleMonsterDirections(monsterObject)
   if (!possibleDirections.length)
     return
 
+  // If monster doesn't have current direction or cannot further go in that direction, set it randomly
   let currentDirection = monsterObject.currentDirection
-
   if (!currentDirection || !possibleDirections.includes(currentDirection)) {
     currentDirection = getRandomItem(possibleDirections)
     monsterObject.currentDirection = currentDirection
   }
-  const coords = directionsCoords[currentDirection]
 
+  const coords = directionsCoords[currentDirection]
+  monsterObject.x += coords[0]
+  monsterObject.y += coords[1]
+
+  monsterCollisionDetection(monsterObject)
+}
+
+function moveMonsterOnEachCrossroad(monsterObject) {
+  // Get possible direcitons
+  const possibleDirections = getPossibleMonsterDirections(monsterObject)
+  if (!possibleDirections.length)
+    return
+
+  // If monster doesn't have current direction or cannot further go in that direction, set it randomly
+  let currentDirection = monsterObject.currentDirection
+  if (!currentDirection || !possibleDirections.includes(currentDirection)) {
+    currentDirection = getRandomItem(possibleDirections)
+    monsterObject.currentDirection = currentDirection
+  }
+
+  // Else - if monster is on crossroad, change direction but don't go back (opposite direction)
+  else if (possibleDirections.length > 2) {
+    // Remove opposite direction from possible directions if it's there
+    const oppositeDirection = oppositeDirections[currentDirection]
+    if(possibleDirections.includes(oppositeDirection))
+      possibleDirections.splice(possibleDirections.indexOf(oppositeDirection), 1)
+    currentDirection = getRandomItem(possibleDirections)
+    monsterObject.currentDirection = currentDirection
+  }
+
+  const coords = directionsCoords[currentDirection]
   monsterObject.x += coords[0]
   monsterObject.y += coords[1]
 
@@ -1710,6 +1735,13 @@ const directionsEnum = {
   BOTTOM: "B",
 }
 
+const oppositeDirections = {
+  [directionsEnum.LEFT]: directionsEnum.RIGHT,
+  [directionsEnum.RIGHT]: directionsEnum.LEFT,
+  [directionsEnum.TOP]: directionsEnum.BOTTOM,
+  [directionsEnum.BOTTOM]: directionsEnum.TOP,
+}
+
 const directionsCoords = {
   [directionsEnum.LEFT]: [-1, 0],
   [directionsEnum.RIGHT]: [1, 0],
@@ -1887,8 +1919,16 @@ const gameManagerInterval = setInterval(() => {
 // -- Start monster movement
 for (const monsterType of categoryMonsters) {
   setInterval(() => {
-    for (let monsterObject of gameState.monsters[monsterType])
-      moveMonsterInLastDirection(monsterObject)
+    for (let monsterObject of gameState.monsters[monsterType]) {
+      switch(monsterType) {
+        case monster4:
+        case monster5:
+          moveMonsterOnEachCrossroad(monsterObject)
+          break
+        default:
+          moveMonsterInLastDirection(monsterObject)
+      }
+    }
   }, monsterSpeedsMs[monsterType])
 }
 // =================================================
