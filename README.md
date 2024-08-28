@@ -4,6 +4,8 @@
 This game is about a bear planting a bombs to explode crates and find a portal to teleport him.
 It's based on the DOS game Dyna Blaster from 1990.
 
+There are 10 levels prepared for you. Can you win them all?
+
 ## ❓ Rules
 - Fire and monsters kills you
 - Plant bombs to kill monsters and explode crates
@@ -12,6 +14,7 @@ It's based on the DOS game Dyna Blaster from 1990.
 ## 🎮 Controls
 - `W` / `S` / `A` / `D` - move player
 - `K` - plant a bomb
+- `J` - remote control - explode a bomb (only when player has collected this powerup)
 - `L` - restart level
 
 ## 🖼 Screenshots
@@ -19,16 +22,4 @@ It's based on the DOS game Dyna Blaster from 1990.
 ![Bomberman](Bomberman_2.png)
 
 ## 🕹 Sprig Snapshot
-You can play game in current state here: [https://sprig.hackclub.com/share/QNsIABoF4l6gJeyc2soj](https://sprig.hackclub.com/share/QNsIABoF4l6gJeyc2soj)
-
-## 📝 TODO
-Game is still in progress, but first level is playable so you can experience it.
-
-Nice to have features, I'll be working on:
-- [x] Add more levels
-- [x] Add more powerups
-- [ ] Exploding portal should spawn enemies
-- [ ] Improve movement of stronger monster
-- [x] ~Add level loading screen~
-- [x] Count score
-- [x] Add death sprites for monsters
+You can play game in current state here: [https://sprig.hackclub.com/share/1T2jsHKfPhRDpt60T0ZR](https://sprig.hackclub.com/share/1T2jsHKfPhRDpt60T0ZR)
