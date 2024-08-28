@@ -115,9 +115,11 @@ function drawYouWinText() {
 function animateSprite(animation, animationTimeMs, object, updateObjectCallback) {
   let animationIdx = 0
   return setInterval(() => {
+    // Get next sprite (type) from animation array
     animationIdx = (animationIdx + 1) % animation.length
     const nextType = animation[animationIdx]
 
+    // Remove current sprite and add new one
     object.remove()
     object = addSpriteWithReturn(object.x, object.y, nextType)
     updateObjectCallback(object)
@@ -126,13 +128,16 @@ function animateSprite(animation, animationTimeMs, object, updateObjectCallback)
 
 // -- Levels
 function setRandomCoordsForPortalAndPowerup() {
+  // Get all crates and shuffle them
   const crates = getAll(crate)
   const shuffledCrates = shuffleArray(crates)
 
+  // Set portal coords
   const crateForPortal = shuffledCrates[0]
   gameState.level.portalCoords = [crateForPortal.x, crateForPortal.y]
 
-  if (gameState.currentPowerupLevelIndex < powerupsOrder.length && shuffledCrates.length >= 2) { // No more powerup in boss level
+  // Set powerup coords
+  if (gameState.currentPowerupLevelIndex < powerupsOrder.length && shuffledCrates.length >= 2) { // No more powerup in boss level or if there's only 1 crate
     const crateForPowerup = shuffledCrates[1]
     gameState.level.powerupCoords = [crateForPowerup.x, crateForPowerup.y]
   }
@@ -150,10 +155,13 @@ function setAllMonstersToGameState() {
 function getPossibleMonsterDirections(monsterObject) {
   let result = []
 
+  // Iterate through all directions
   for (const direction of Object.values(directionsEnum)) {
     const coordsToCheck = addCoords([monsterObject.x, monsterObject.y], directionsCoords[direction])
 
+    // Check if sprite is in bounds of the level
     if (isSpriteInBounds(...coordsToCheck)) {
+      // Check if there's no block, crate or bomb
       const tileSprites = getTile(...coordsToCheck)
       if (!tileSprites.some(x => categoryBlocks.includes(x.type) || categoryCrates.includes(x.type) || categoryBombs.includes(x.type)))
         result.push(direction)
@@ -167,7 +175,7 @@ function monsterCollisionDetection(monsterObject) {
   const tileSprites = getTile(monsterObject.x, monsterObject.y)
 
   // Monster kills player
-  if (tileSprites.some(x => x.type === player))
+  if (tileSprites.some(x => categoryPlayers.includes(x.type)))
     killPlayer()
 
   // Fire kills monsters
@@ -225,33 +233,24 @@ function moveMonsterOnEachCrossroad(monsterObject) {
   monsterCollisionDetection(monsterObject)
 }
 
-function moveMonsterRandomly(monsterObject) {
-  const possibleDirections = getPossibleMonsterDirections(monsterObject)
-  if (!possibleDirections.length)
-    return
-
-  const direction = getRandomItem(possibleDirections)
-  const coords = directionsCoords[direction]
-
-  monsterObject.x += coords[0]
-  monsterObject.y += coords[1]
-
-  monsterCollisionDetection(monsterObject)
-}
-
 function killMonster(monsterObject) {
+  // Update monsters in the game state
   gameState.monsters[monsterObject.type] = gameState.monsters[monsterObject.type].filter(x => x !== monsterObject)
+
+  // Add burnt monster sprite and remove alive monster sprite
   const burntMonsterObject = addSpriteWithReturn(monsterObject.x, monsterObject.y, monstersBurntSprites[monsterObject.type])
   monsterObject.remove()
 
   // Animate burnt monster
   setTimeout(() => burntMonsterObject.remove(), burntMonsterLastsMs)
 
+  // Update score and redraw text with score
   gameState.score += monstersScores[monsterObject.type]
   drawAllText()
 }
 
 function killMonsters(tileSprites) {
+  // Kill all monsters on the given tile
   const monsterObjects = tileSprites.filter(x => categoryMonsters.includes(x.type))
   for (const monsterObject of monsterObjects)
     killMonster(monsterObject)
@@ -261,6 +260,7 @@ function killMonsters(tileSprites) {
 function checkPlayerSpeedLimit() {
   const now = performance.now()
 
+  // Check if elapsed time is greater than player speed limit
   if (now - gameState.player.playerLastMoveAt >= gameState.player.playerSpeedMs) {
     gameState.player.playerLastMoveAt = now
     return true
@@ -290,10 +290,9 @@ function killPlayer() {
   gameState.player.hasRemoteControl = false
   gameState.player.canPassThroughBombs = false
   gameState.player.canPassThroughCrates = false
-  // Reset score
+  
+  // Reset score and decrease lives
   gameState.score = 0
-
-  // Decrease lives
   gameState.player.lives--
   drawAllText()
 }
@@ -301,6 +300,11 @@ function killPlayer() {
 function movePlayer(direction) {
   if (!playerObject || gameState.gameOver) return
   if (!checkPlayerSpeedLimit()) return
+
+  // Replace player sprite by direction
+  const newPlayerObject = addSpriteWithReturn(playerObject.x, playerObject.y, playerMoveSprites[direction])
+  playerObject.remove()
+  playerObject = newPlayerObject
 
   // Check solids that doesn't have to be solids (because of powerups)
   const [dx, dy] = directionsCoords[direction]
@@ -371,7 +375,7 @@ function movePlayer(direction) {
 
     playerObject = null // So player can't move anymore
 
-    // Move to next level
+    // Move to next level after some time
     setTimeout(() => {
       level++
       startLevel()
@@ -401,10 +405,13 @@ function explodeBomb(bombObject) {
   const bombIndex = gameState.bombs.findIndex(x => compareCoords([x.object.x, x.object.y], [bombObject.x, bombObject.y]))
   const gameStateBomb = gameState.bombs[bombIndex]
 
+  // Stop animation and detonation timeout (so it doesn't explode twice)
   clearInterval(gameStateBomb.animationInterval)
   clearTimeout(gameStateBomb.timeout)
 
   playTune(soundBombExplodes)
+
+  // Remove bomb sprite
   const tileSprites = getTile(bombObject.x, bombObject.y)
   for (const sprite of tileSprites) {
     if (categoryBombs.includes(sprite.type))
@@ -418,7 +425,7 @@ function explodeBomb(bombObject) {
   // Explode in center
   addSprite(bombObject.x, bombObject.y, fireCross)
   // Kill player in the center
-  if (tileSprites.some(x => x.type === player)) {
+  if (tileSprites.some(x => categoryPlayers.includes(x.type))) {
     killPlayer()
   }
   // Explode in all directions
@@ -450,6 +457,7 @@ function explodeInOneDirection(bombCoords, direction) {
   const directionCoords = directionsCoords[direction]
   const { end: fireEnd, middle: fireMiddle } = directionsFires[direction]
 
+  // Explode in one direction for the steps of flame length (or until it hits block or crate)
   for (let i = 1; i <= gameState.player.flameLength; i++) {
     const newCoords = addCoords(bombCoords, multiplyCoords(directionCoords, i))
 
@@ -497,7 +505,7 @@ function explodeInOneDirection(bombCoords, direction) {
     }
 
     // Kill player
-    if (tileSprites.some(x => x.type === player)) {
+    if (tileSprites.some(x => categoryPlayers.includes(x.type))) {
       killPlayer()
     }
 
@@ -538,6 +546,7 @@ function explodeInOneDirection(bombCoords, direction) {
       }, explosionLastsMs)
     }
 
+    // Add fire sprite
     addSprite(
       ...newCoords,
       i === gameState.player.flameLength ? fireEnd : fireMiddle
@@ -618,6 +627,7 @@ const backgroundBlue = "P"
 // =================================================
 
 // = Type categories ===============================
+const categoryPlayers = [player, playerL, playerR, playerT]
 const categoryBombs = [bomb1, bomb2, bomb3]
 const categoryBlocks = [block, blockL, blockR, blockCorner1, blockCorner2, blockCornerTR, blockCornerTL]
 const categoryCrates = [crate, crateExplosion]
@@ -1552,7 +1562,7 @@ C3333CCCCCCC333C
 
 setSolids([
   // Player
-  player,
+  player, playerL, playerR, playerT,
   // Blocks
   block, blockL, blockR, blockCorner1, blockCorner2, blockCornerTR, blockCornerTL,
 ])
@@ -1867,6 +1877,13 @@ const playerMoveControls = {
   "d": directionsEnum.RIGHT,
 }
 
+const playerMoveSprites = {
+  [directionsEnum.LEFT]: playerL,
+  [directionsEnum.RIGHT]: playerR,
+  [directionsEnum.TOP]: playerT,
+  [directionsEnum.BOTTOM]: player,
+}
+
 // -- Timeouts
 const bombTimeoutTimeMs = 4000
 const bombAnimationTimeMs = 250
@@ -1959,6 +1976,7 @@ const initialGameState = {
   portalAnimationInterval: null,
 }
 
+// Deep copy of initialGameState
 let gameState = JSON.parse(JSON.stringify(initialGameState))
 // =================================================
 
@@ -2023,9 +2041,11 @@ startLevel()
 const gameManagerInterval = setInterval(() => {
   // Start portal animation when all monsters are killed and portal is not animated yet
   if (Object.values(gameState.monsters).flat().length === 0) {
+    // Animate portal if it's not animated yet - so player knows he can go to the next level
     if (gameState.portalAnimationInterval === null) {
       const portalCoords = gameState.level.portalCoords
       const tileSprites = getTile(...portalCoords)
+
       if (tileSprites.some(x => categoryPortals.includes(x.type))) {
         let portalObject = tileSprites.find(x => categoryPortals.includes(x.type))
         gameState.portalAnimationInterval = animateSprite(animationPortal, portalAnimationTimeMs, portalObject, (newObject) => { portalObject = newObject });
@@ -2051,6 +2071,7 @@ for (const monsterType of categoryMonsters) {
     for (let monsterObject of gameState.monsters[monsterType]) {
       switch (monsterType) {
         case monster4:
+        case monster5:
           moveMonsterOnEachCrossroad(monsterObject)
           break
         default:
@@ -2062,11 +2083,13 @@ for (const monsterType of categoryMonsters) {
 // =================================================
 
 // = Controls ======================================
+// -- Player movement
 for (const control in playerMoveControls)
   onInput(control, () => {
     movePlayer(playerMoveControls[control])
   })
 
+// -- Restart game
 onInput("l", () => {
   if (playerObject || !gameState.gameOver) return
 
@@ -2079,7 +2102,7 @@ onInput("l", () => {
   startLevel()
 })
 
-// Remote control powerup
+// -- Remote control powerup
 onInput("j", () => {
   if (!playerObject || gameState.gameOver || !gameState.player.hasRemoteControl) return
   if (!gameState.bombs.length) return
@@ -2087,6 +2110,7 @@ onInput("j", () => {
   explodeBomb(gameState.bombs[0].object)
 })
 
+// -- Bomb planting
 onInput("k", () => {
   if (!playerObject || gameState.gameOver) return
 
@@ -2094,6 +2118,7 @@ onInput("k", () => {
   const bomb = getTile(playerObject.x, playerObject.y).find(x => categoryBombs.includes(x.type))
   if (bomb) return
 
+  // Check if player has enough bombs to plant
   if (gameState.player.bombsToPlant <= 0)
     return
   gameState.player.bombsToPlant--
