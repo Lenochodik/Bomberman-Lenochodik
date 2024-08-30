@@ -27,5 +27,5 @@ https://github.com/user-attachments/assets/663c43e2-3753-4888-9b1b-430f474e4b83
 
 
 
-## 🕹 Sprig Snapshot
+## 🕹 Play the game (Sprig Snapshot)
 You can play game in current state here: [https://sprig.hackclub.com/share/1T2jsHKfPhRDpt60T0ZR](https://sprig.hackclub.com/share/1T2jsHKfPhRDpt60T0ZR)
